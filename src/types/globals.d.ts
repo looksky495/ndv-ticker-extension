@@ -1,7 +1,7 @@
 // Global declarations for legacy popup scripts loaded via index.html.
 // Keep this lightweight; refine types as modules are migrated to TypeScript.
 
-import type { DataOperatorPublic, TsunamiOperator, TyphCommentOperator, WarnCurrentOperator, TrafficTracker as TrafficTrackerClass } from '../popup/data/jmaDataOperator';
+import type { DataOperatorPublic, TsunamiOperator, TyphCommentOperator, WarnCurrentOperator, TrafficTracker as TrafficTrackerClass } from '../popup/data/jmaDataOperator.ts';
 
 // Quake list samples: db/20240101_quake/quake_list1.json, db/20240101_quake/quake_list2.json,
 // db/20240808_quake/quakelist.json, db/jma_quake/list.json

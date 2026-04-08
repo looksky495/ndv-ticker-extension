@@ -1,27 +1,27 @@
 'use strict';
 
-import './uncategorized/prototype-extension';
-import { RequestURL } from './data/requestURL';
-import './data/jmaDataOperator';
-import { getRiverPoints } from './data/riverPoints';
-import { multilingualQuake } from './data/multilingual-quake';
-import { AreaForecastLocalM } from './uncategorized/data-AreaForecastLocalM';
-import { epicenter_list } from './uncategorized/data-epicenter';
-import { AreaForecastLocalE, AreaEpicenter2Code, OfficeID2PrefName, JapanGeoJSON } from './data/japan';
-import { AudioSpeechController, AudioSpeaker } from './uncategorized/init-speechController';
-import type { AudioSpeechQueueParam } from './uncategorized/init-speechController';
-import { renderQuakeView, quakeRenderState, prepareQuakeState } from './routines/quakeView';
-import { renderEewView } from './routines/eewView';
-import { renderNormalTitle } from './routines/normalView';
-import { NewsOperator, renderNewsView, renderNewsStandbyList, renderNewsTitle } from './routines/newsView';
-import { advanceTsunamiPage, createTsunamiOverlayState, renderTsunamiOverlay, setTsunamiCancelled, setTsunamiIssued, updateTsunamiList } from './routines/tsunamiView';
-import { VariableAnimation } from './uncategorized/variable-animation';
-import { calcMapZoom } from './uncategorized/init-wasm';
-import { canvas1, context, time } from './uncategorized/init-canvas';
-import { FontFamilies, colorScheme, colorThemeMode, setColorThemeMode } from './uncategorized/config';
-import { loadFonts } from './uncategorized/init-fontOperator';
-import type { AppConfig, NormalText, tsunamiPositionStyle } from '../shared/storage';
-import * as storageProvider from "../shared/storage";
+import './uncategorized/prototype-extension.ts';
+import { RequestURL } from './data/requestURL.ts';
+import './data/jmaDataOperator.ts';
+import { getRiverPoints } from './data/riverPoints.ts';
+import { multilingualQuake } from './data/multilingual-quake.ts';
+import { AreaForecastLocalM } from './uncategorized/data-AreaForecastLocalM.ts';
+import { epicenter_list } from './uncategorized/data-epicenter.ts';
+import { AreaForecastLocalE, AreaEpicenter2Code, OfficeID2PrefName, JapanGeoJSON } from './data/japan.ts';
+import { AudioSpeechController, AudioSpeaker } from './uncategorized/init-speechController.ts';
+import type { AudioSpeechQueueParam } from './uncategorized/init-speechController.ts';
+import { renderQuakeView, quakeRenderState, prepareQuakeState } from './routines/quakeView.ts';
+import { renderEewView } from './routines/eewView.ts';
+import { renderNormalTitle } from './routines/normalView.ts';
+import { NewsOperator, renderNewsView, renderNewsStandbyList, renderNewsTitle } from './routines/newsView.ts';
+import { advanceTsunamiPage, createTsunamiOverlayState, renderTsunamiOverlay, setTsunamiCancelled, setTsunamiIssued, updateTsunamiList } from './routines/tsunamiView.ts';
+import { VariableAnimation } from './uncategorized/variable-animation.ts';
+import { calcMapZoom } from './uncategorized/init-wasm.ts';
+import { canvas1, context, time } from './uncategorized/init-canvas.ts';
+import { FontFamilies, colorScheme, colorThemeMode, setColorThemeMode } from './uncategorized/config.ts';
+import { loadFonts } from './uncategorized/init-fontOperator.ts';
+import type { AppConfig, NormalText, tsunamiPositionStyle } from '../shared/storage.ts';
+import * as storageProvider from "../shared/storage.ts";
 
 
 // import easyXhr from "./modules/easyXhr.js";
@@ -1679,10 +1679,10 @@ const Routines = {
     const targetTime = getAdjustedDate();
     const targetTimeInt = targetTime.valueOf();
     // 津波予報の失効時刻になったら・・・
-    const tsunamiExpire = Number((DataOperator.tsunami as any).expire);
+    const tsunamiExpire = DataOperator.tsunami.expire;
     if (DataOperator.tsunami.isIssued && tsunamiExpire <= targetTimeInt){
       DataOperator.tsunami.isIssued = false;
-      (DataOperator.tsunami as any).onUpdate?.(undefined); // isIssued = false なので引数なくてもok
+      DataOperator.tsunami.onUpdate?.(); // isIssued = false なので引数なくてもok
     }
 
     if (viewMode !== 3) textOffsetX -= textSpeed;
@@ -3533,6 +3533,8 @@ const SFXController = {
 
 DataOperator.tsunami.onUpdate = (data, vtse41, vtse51) => {
   if (DataOperator.tsunami.isIssued){
+    if (data === void 0) throw new Error("Tsunami data is required.");
+
     setTsunamiIssued(tsunamiOverlayState, data.text.head);
     updateTsunamiList({
       element: elements.id.tsunamiList,

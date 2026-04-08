@@ -98,7 +98,7 @@ export type TsunamiOperator = {
   eventIdList41: string[];
   eventIdList51: string[];
   isIssued: boolean;
-  onUpdate: (state: TsunamiOperator, vtse41?: string, vtse51?: string) => void;
+  onUpdate: (state?: TsunamiOperator, vtse41?: string, vtse51?: string) => void;
   tracker_list: TrafficTracker;
   tracker_vtse41: TrafficTracker;
   tracker_vtse51: TrafficTracker;

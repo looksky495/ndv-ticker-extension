@@ -1,5 +1,5 @@
-import { AreaCode2Epicenter, AreaForecastLocalE } from '../data/japan';
-import { AreaForecastLocalM } from './data-AreaForecastLocalM';
+import { AreaCode2Epicenter, AreaForecastLocalE } from '../data/japan.ts';
+import { AreaForecastLocalM } from './data-AreaForecastLocalM.ts';
 
 import JSZip from 'jszip';
 
