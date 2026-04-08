@@ -1,4 +1,4 @@
-import * as storageProvider from "./storage";
+import * as storageProvider from "../shared/storage";
 
 let windowId: number | null = null;
 

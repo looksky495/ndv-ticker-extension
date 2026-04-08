@@ -10,6 +10,11 @@ export type AudioSpeechQueueParam =
   | { type: "skip" }
   | { type: "wait"; time: number };
 
+type AudioSpeechQueueItem =
+  | { type: "direct"; data: AudioBuffer; gain: number }
+  | { type: "id"; id: string; gain?: number }
+  | { type: "wait"; time: number };
+
 // 2つ同時に鳴らせるようにするのも考えたけど、よく考えたら2つ同時に鳴らす意味なかった
 export class AudioSpeechController extends EventTarget {
   /**
@@ -22,13 +27,12 @@ export class AudioSpeechController extends EventTarget {
     super();
   }
   isInitializing = false;
-  #audioContext = null;
-  #bufferSource = null;
-  #wholeGain = null;
-  #sourceGain = null;
-  #canPlay = null;
+  #audioContext: BaseAudioContext | null = null;
+  #bufferSource: AudioBufferSourceNode | null = null;
+  #wholeGain: GainNode | null = null;
+  #sourceGain: GainNode | null = null;
   #paused = true;
-  #speakers = [];
+  #speakers: AudioSpeaker[] = [];
   #urls = {
     common: {
       depth: (new Array(71)).fill(0).map((_item, i) => "common/depth/" + (i * 10) + ".wav"),
@@ -69,10 +73,11 @@ export class AudioSpeechController extends EventTarget {
     },
     VPOA50_issued: "VPOA50_issued.wav"
   };
-  #speechData = {
+  #speechData: { fromId: Record<string, AudioSpeechQueueItem>; queue: AudioSpeechQueueItem[] } = {
     fromId: {},
     queue: []
   };
+  #sources: Record<string, { url: string; audioData: Record<string, AudioBuffer> }> = {};
   speechStatus = {
     START_INIT: 1,
     LOAD_FILE_PROGRESS: 3,
@@ -82,7 +87,6 @@ export class AudioSpeechController extends EventTarget {
     // START_SPEECH: 10,
     // END_SPEECH: 11
   };
-  #sources = {};
   /** 煮たり焼いたりしていいオブジェクト */
   userSpace = {};
 
@@ -132,7 +136,7 @@ export class AudioSpeechController extends EventTarget {
     this.dispatchEvent(inputEvent);
   }
   get volume (){
-    return this.#wholeGain?.gain?.value;
+    return this.#wholeGain?.gain?.value ?? 1;
   }
 
   /**
@@ -140,7 +144,7 @@ export class AudioSpeechController extends EventTarget {
    * @param {Number} waitTime
    */
   #wait (waitTime = 0){
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
       setTimeout(() => resolve(), waitTime);
     });
   }
@@ -160,14 +164,17 @@ export class AudioSpeechController extends EventTarget {
         return { type: "id", id: param.id };
       case "wait":
         return { type: "wait", time: param.time - 0 };
+      case "skip":
+        return { type: "wait", time: 0 };
     }
+    throw new Error("Unsupported queue param type");
   }
 
   /**
    * キューに登録し、読み上げを開始する
    * @param {AudioSpeechQueueParam[]} speechData 読み上げデータ
    */
-  async start (speechData = []){
+  async start (speechData: AudioSpeechQueueParam[] = []){
     if (!this.isInitializing) return;
     this.#argumentValidation(speechData, Array, "start");
     for (let i=0; i<speechData.length; i++){
@@ -191,7 +198,7 @@ export class AudioSpeechController extends EventTarget {
    * @param {String} id ID
    * @param {AudioSpeechQueueParam} speechData 読み上げデータ
    */
-  setId (id, speechData){
+  setId (id: string, speechData: AudioSpeechQueueParam){
     if (!this.isInitializing) return;
     id += "";
     this.#speechData.fromId[id] = this.#qParam2qItem(speechData);
@@ -202,7 +209,7 @@ export class AudioSpeechController extends EventTarget {
    */
   allCancel (){
     this.#speechData.queue = [];
-    try { this.#bufferSource.stop(); } catch {};
+    try { this.#bufferSource?.stop(); } catch {};
   }
 
   get paused (){
@@ -213,7 +220,7 @@ export class AudioSpeechController extends EventTarget {
     return this.#speechData.queue.length;
   }
 
-  addSpeaker (speaker){
+  addSpeaker (speaker: AudioSpeaker){
     if (this.isInitializing) throw Error("初期化する前に実行してください。");
     this.#speakers.push(speaker);
   }
@@ -234,7 +241,7 @@ export class AudioSpeechController extends EventTarget {
    * @param id ID
    * @param loopDetect ループを検知するID
    */
-  #getSourceFromId (id: string, loopDetect: string[] = []){
+  #getSourceFromId (id: string, loopDetect: string[] = []): AudioBuffer | undefined {
     if (!Object.hasOwn(this.#speechData.fromId, id)) return;
     /** @type {AudioSpeechQueueItem} */
     const target = this.#speechData.fromId[id];
@@ -245,8 +252,6 @@ export class AudioSpeechController extends EventTarget {
         if (loopDetect.includes(target.id)) throw RangeError('Infinite loop detected at "' + target.id + '".');
         loopDetect.push(target.id);
         return this.#getSourceFromId(target.id, loopDetect);
-      case "skip":
-        return;
     }
   }
 
@@ -261,7 +266,10 @@ export class AudioSpeechController extends EventTarget {
           await this.#startBufferSync(speechItem.data, speechItem.gain);
           break;
         case "id":
-          await this.#startBufferSync(this.#getSourceFromId(speechItem.id), speechItem.gain);
+          {
+            const buffer = this.#getSourceFromId(speechItem.id);
+            if (buffer) await this.#startBufferSync(buffer, speechItem.gain);
+          }
           break;
         case "wait":
           await this.#wait(speechItem.time);
@@ -281,9 +289,10 @@ export class AudioSpeechController extends EventTarget {
     return new Promise(resolve => {
       if (!audioData) resolve();
       this.#argumentValidation(audioData, AudioBuffer, "#startBufferSync");
+      if (!this.#sourceGain) throw new Error("sourceGain is not initialized");
       const bufferSource = this.#initABSNode(this.#sourceGain, audioData);
       this.#sourceGain.gain.value = gain;
-      bufferSource.addEventListener("ended", resolve);
+      bufferSource.addEventListener("ended", () => resolve());
       bufferSource.start();
       this.#paused = false;
     });
@@ -301,6 +310,7 @@ export class AudioSpeechController extends EventTarget {
     if (this.#bufferSource){
       try { this.#bufferSource.disconnect(destination); } catch {}
     }
+    if (!this.#audioContext) throw new Error("audioContext is not initialized");
     const bufferSource = this.#audioContext.createBufferSource();
     bufferSource.buffer = audioData;
     bufferSource.loop = false;
@@ -314,11 +324,11 @@ export class AudioSpeechController extends EventTarget {
    * @param {AudioContext} audioContext
    */
   async #initSpeaker (audioContext: BaseAudioContext){
-    const ZipData = {};
+    const ZipData: Record<string, JSZip> = {};
     for (const speaker of this.#speakers){
       if (speaker.isAvaliable){
-        ZipData[speaker.id] = await (new Promise(resolve => {
-          const xhr = new XMLHttpRequest();
+        ZipData[speaker.id] = await (new Promise<ArrayBuffer>((resolve) => {
+          const xhr: XMLHttpRequest & { requestFileName?: string } = new XMLHttpRequest();
           xhr.addEventListener("load", () => {
             resolve(xhr.response);
           });
@@ -337,17 +347,20 @@ export class AudioSpeechController extends EventTarget {
     }
 
     this.#speechStatusEvent(this.speechStatus.START_DECODING);
-    const propLoop = async (parent, propName, prefix) => {
+    const propLoop = async (parent: Record<string, any>, propName: string, prefix: string) => {
       const target = parent[propName];
       if (target instanceof Object){
         for (const item of Object.keys(target)){
           await propLoop(target, item, prefix + propName + ".");
         }
       } else {
-        const audioDataAll = {};
+        const audioDataAll: Record<string, AudioBuffer> = {};
         for (const speakerData of this.#speakers){
           if (speakerData.isAvaliable){
-            const arrayBuffer = await ZipData[speakerData.id].file(speakerData.id + "/" + target).async("arraybuffer");
+            const zip = ZipData[speakerData.id];
+            const file = zip?.file(speakerData.id + "/" + target);
+            if (!file) continue;
+            const arrayBuffer = await file.async("arraybuffer");
             const decodedAudio = await audioContext.decodeAudioData(arrayBuffer);
             audioDataAll[speakerData.id] = decodedAudio;
           }
@@ -387,7 +400,7 @@ export class AudioSpeechController extends EventTarget {
 
 export class AudioSpeaker {
   static displayName = "AudioSpeaker";
-  #speakerData = {};
+  #speakerData: { isAvaliable: boolean; name: string; gender: "male" | "female" | null | string; version: string };
   #speakerId = "";
   /**
    *
@@ -405,7 +418,7 @@ export class AudioSpeaker {
     this.#speakerData = {
       isAvaliable: !!(isAvaliable ?? true),
       name: name + "",
-      gender: gender + "",
+      gender: gender ?? null,
       version: version + ""
     };
   }
@@ -413,7 +426,7 @@ export class AudioSpeaker {
     return this.#speakerData.isAvaliable;
   }
   set isAvaliable (bool){
-    return this.#speakerData.isAvaliable = !!bool;
+    this.#speakerData.isAvaliable = !!bool;
   }
   get id (){
     return this.#speakerId;

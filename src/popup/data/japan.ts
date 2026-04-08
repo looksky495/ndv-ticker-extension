@@ -2,19 +2,6 @@ export type ConnectToSandbox = (name: string, payload: any) => Promise<number>;
 
 export let JapanGeoJSON: any = {};
 
-export async function loadJapanGeojson(connectToSandbox?: ConnectToSandbox){
-  const url = new URL('/src/assets/data/20190125_AreaForecastLocalEEW_GIS_20.geojson', import.meta.url).href;
-  try {
-    const geojson = await fetch(url).then(response => response.json());
-    JapanGeoJSON = geojson;
-    if (connectToSandbox) await connectToSandbox('geojson_send', geojson);
-    return geojson;
-  } catch (error) {
-    console.error('Failed to load Japan GeoJSON', error);
-    return JapanGeoJSON;
-  }
-}
-
 export const OfficeID2PrefName = {
   "100000": "群馬県",
   "110000": "埼玉県",

@@ -7,7 +7,7 @@ import { getRiverPoints } from './data/riverPoints';
 import { multilingualQuake } from './data/multilingual-quake';
 import { AreaForecastLocalM } from './uncategorized/data-AreaForecastLocalM';
 import { epicenter_list } from './uncategorized/data-epicenter';
-import { AreaForecastLocalE, AreaEpicenter2Code, OfficeID2PrefName, JapanGeoJSON, loadJapanGeojson } from './data/japan';
+import { AreaForecastLocalE, AreaEpicenter2Code, OfficeID2PrefName, JapanGeoJSON } from './data/japan';
 import { AudioSpeechController, AudioSpeaker } from './uncategorized/init-speechController';
 import type { AudioSpeechQueueParam } from './uncategorized/init-speechController';
 import { renderQuakeView, quakeRenderState, prepareQuakeState } from './routines/quakeView';
@@ -15,11 +15,13 @@ import { renderEewView } from './routines/eewView';
 import { renderNormalTitle } from './routines/normalView';
 import { NewsOperator, renderNewsView, renderNewsStandbyList, renderNewsTitle } from './routines/newsView';
 import { advanceTsunamiPage, createTsunamiOverlayState, renderTsunamiOverlay, setTsunamiCancelled, setTsunamiIssued, updateTsunamiList } from './routines/tsunamiView';
-import { Variable_Animation } from './uncategorized/variable-animation';
-import { connect2sandbox } from './uncategorized/init-sandbox';
+import { VariableAnimation } from './uncategorized/variable-animation';
+import { calcMapZoom } from './uncategorized/init-wasm';
 import { canvas1, context, time } from './uncategorized/init-canvas';
 import { FontFamilies, colorScheme, colorThemeMode, setColorThemeMode } from './uncategorized/config';
 import { loadFonts } from './uncategorized/init-fontOperator';
+import type { AppConfig, NormalText, tsunamiPositionStyle } from '../shared/storage';
+import * as storageProvider from "../shared/storage";
 
 
 // import easyXhr from "./modules/easyXhr.js";
@@ -33,44 +35,8 @@ import { loadFonts } from './uncategorized/init-fontOperator';
 //  ホームページ
 //  Google Apps Script
 //  AppVersionHistory
-//  AppVersionCode
-//  AppVersionView
+//  AppVersionCodem
 //  SpeechVersionData
-
-const AppVersionHistory = [
-  "β0.1.0",
-  "β0.1.1",
-  "β0.1.2",
-  "β0.1.3",
-  "β0.1.4",
-  "β0.1.5",
-  "β0.1.6",
-  "β0.2.0",
-  "β0.2.1",
-  "β0.2.2",
-  "β0.2.3",
-  "β0.2.4",
-  "β0.2.5",
-  "β0.2.6",
-  "β0.2.7",
-  "β0.2.8",
-  "β0.2.9",
-  "β0.3.0",
-  "β0.3.1",
-  "β0.3.2",
-  "β0.3.3",
-  "β0.3.4",
-  "β0.4.0",
-  "β0.4.1",
-  "β0.4.2",
-  "β0.5.0",
-  "β0.5.1",
-  "β0.5.2",
-  "β0.5.3",
-  "β0.5.4",
-  "β0.5.5",
-  "β0.6.0"
-];
 
 const AppVersionCode = "beta30";
 const AppVersionView = "β0.6.0";
@@ -536,6 +502,8 @@ var textSpeed = 5,
     viewingTextIndex = 0,
     heightBeforeFull = 0;
 
+  let appConfig: AppConfig | null = null;
+
     const syncDirectTextsFromNormalItems = () => {
       // MIG-TEMP: Legacy bridge to flatten normalItems into legacy directTexts; remove after render uses normalItems directly.
       // Flatten normalItems into legacy directTexts slots (0-4: messages, 5-9: titles)
@@ -566,25 +534,25 @@ var q_msiText = shindoListJP[q_maxShindo],
     q_startTime = 0,
     q_epiIdx = 0,
     quake_customComment = "";
-  const earthquakes_log: Record<string, any> = {};
+const earthquakes_log: Record<string, any> = {};
 // variables of Earthquake Early Warning
 var eewEpicenter = '',
     eewOriginTime = new Date("2000/01/01 00:00:00"),
     eewCalcintensity = '',
     eewCalcIntensityIndex = 0,
     eewDepth = '',
-  _eewAlertFlgText = '',
-  _eewCancelText = '',
+    _eewAlertFlgText = '',
+    _eewCancelText = '',
     eewMagnitude = 0,
     eewReportNumber: string | number = '',
     eewReportID = '',
     eewIsFinal = true,
-  _eewIsTraning = false,
+    _eewIsTraning = false,
     eewIsCancel = false,
     eewIsAlert = false,
-  _eewAt = new Date("2000/01/01 00:00:00"),
+    _eewAt = new Date("2000/01/01 00:00:00"),
     eewEpicenterID = "",
-  _eewIsSea = false,
+    _eewIsSea = false,
     eewIsAssumption = false,
     eewWarnForecast = "",
     // eewAboutHypocenter = "",
@@ -870,8 +838,12 @@ const textureFonts = images.texture as Record<string, any>;
       const xhr: XhrWithExtras = new XMLHttpRequest() as XhrWithExtras;
       xhr.original = s;
       xhr.addEventListener("load", function(this: XhrWithExtras){
+        if (this.status !== 200){
+          console.warn("Texture json fetch failed", this.responseURL, this.status);
+          return;
+        }
         console.log("Loaded: " + this.responseURL);
-        const json = JSON.parse(this.response) as {
+        let json: {
           name: string;
           size: string | number;
           bold?: boolean;
@@ -879,6 +851,12 @@ const textureFonts = images.texture as Record<string, any>;
           text?: string[];
           datas?: any[];
         };
+        try {
+          json = JSON.parse(this.response);
+        } catch (err){
+          console.warn("Texture json parse failed", this.responseURL, err);
+          return;
+        }
         const output: { letters: Record<string, any> } = { letters: {} };
         const texts: string[] = json.text ?? [];
         for (let i=0, l=texts.length; i<l; i++){
@@ -1090,9 +1068,10 @@ const __drawTextureImage = (function(){
 
 const sorabtn_qr_img = new Image() as TextureImageWithBitmap;
 {
-  const textPaths = import.meta.glob('/src/assets/image/**/*.png', { as: 'url', eager: true });
+  const textPaths = import.meta.glob('/src/assets/image/**/*.png', { query: "?url", import: "default", eager: true }) as Record<string, string>;
 
   const onImageLoaded = (ev: Event) => {
+    console.log(ev);
     const target = ev.currentTarget as TextureImageWithBitmap | null;
     if (!target) return;
     if (!("imgBmp" in target)) target.imgBmp = undefined;
@@ -1146,7 +1125,7 @@ function getAdjustedDate(){
 // main variables
 var soraopen_moving = 1081;
 var soraopen_move: any = null;
-var intervalArray: any[] = [];
+var intervalArray: NodeJS.Timeout[] = [];
 var soraopen_color = 0;
 var sorabtn_last_reading = 0;
 var sorabtn_now_reading = false;
@@ -1155,13 +1134,13 @@ var getSorabtnstatus_task = 0;
 var soraopen_intervaltime = 0;
 var intervalTime = 0;
 var intervalTime1 = 0;
-var soraopen_interval1: any = null;
-var t=0;
-var cnv_anim1 = new Variable_Animation(440, "sliding", []);
-var anim_soraview = new Variable_Animation(250, "sliding_3", [1081, 1]);
-var anim_soraview_color = new Variable_Animation(250, "Normal", [0, 255]);
-var anim_soraopen = new Variable_Animation(2100, "sliding", [0, 210]);
-var anim_fullscreen = new Variable_Animation(3000, "Normal", [5, 0]);
+var soraopen_interval1: NodeJS.Timeout | null = null;
+var t = 0;
+var cnv_anim1 = new VariableAnimation(440, "sliding", []);
+var anim_soraview = new VariableAnimation(250, "sliding_3", [1081, 1]);
+var anim_soraview_color = new VariableAnimation(250, "Normal", [0, 255]);
+var anim_soraopen = new VariableAnimation(2100, "sliding", [0, 210]);
+var anim_fullscreen = new VariableAnimation(3000, "Normal", [5, 0]);
 var testNow = false;
 var lastSaveTime = Date.now();
 void sorabtn_last_reading;
@@ -1169,7 +1148,6 @@ void sorabtn_now_reading;
 void sorabtn_reading_done_time;
 void getSorabtnstatus_task;
 void soraopen_move;
-void intervalArray;
 void soraopen_intervaltime;
 void soraopen_interval1;
 void anim_soraopen;
@@ -1190,120 +1168,129 @@ const _intensity_list = {
 };
 void _intensity_list;
 
-function savedata(){
-  const getInputValue = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? "";
-  const getInputChecked = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.checked ?? false;
-  const getValueAsNumber = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.valueAsNumber ?? 0;
-  const data = {
-    mode0: {
-      title: [
-        getInputValue('title1'),
-        getInputValue('title2'),
-        getInputValue('title3'),
-        getInputValue('title4'),
-        getInputValue('title5')
-      ],
-      main: [
-        getInputValue('message1'),
-        getInputValue('message2'),
-        getInputValue('message3'),
-        getInputValue('message4'),
-        getInputValue('message5')
-      ]
-    },
-    mode3: [
-      getInputValue('BNtitle'),
-      getInputValue('BNtext1'),
-      getInputValue('BNtext2')
-    ],
-    settings: {
-      tickerSpeed: getValueAsNumber("speedVal"),
-      // fixitem: [
-      //   document.getElementsByName('scrollfix')[0].checked,
-      //   document.getElementsByName('scrollfix')[1].checked,
-      //   document.getElementsByName('scrollfix')[2].checked,
-      //   document.getElementsByName('scrollfix')[3].checked,
-      //   document.getElementsByName('scrollfix')[4].checked
-      // ],
-      viewTsunamiType: elements.id.viewTsunamiType.value,
-      soraview: getInputChecked('isSoraview'),
-      details: {
-        earthquake: {
-          intensity: (document.getElementsByName('minint')[0] as HTMLInputElement | undefined)?.value ?? "",
-          magnitude: (document.getElementsByName('minmag')[0] as HTMLInputElement | undefined)?.value ?? "",
-          depth: (document.getElementsByName('depmin')[0] as HTMLInputElement | undefined)?.value ?? ""
+const getInputValue = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? "";
+const getInputChecked = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.checked ?? false;
+const getValueAsNumber = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.valueAsNumber ?? 0;
+
+const toTsunamiPosition = (value: string): tsunamiPositionStyle => {
+  switch (value) {
+    case "0":
+      return "none";
+    case "2":
+      return "replace";
+    default:
+      return "top";
+  }
+};
+
+const fromTsunamiPosition = (value?: tsunamiPositionStyle): string => {
+  switch (value) {
+    case "none":
+      return "0";
+    case "replace":
+      return "2";
+    default:
+      return "1";
+  }
+};
+
+const buildNormalTextsFromInputs = (): NormalText[] => {
+  const titles = [
+    getInputValue('title1'),
+    getInputValue('title2'),
+    getInputValue('title3'),
+    getInputValue('title4'),
+    getInputValue('title5')
+  ];
+  const messages = [
+    getInputValue('message1'),
+    getInputValue('message2'),
+    getInputValue('message3'),
+    getInputValue('message4'),
+    getInputValue('message5')
+  ];
+
+  return Array.from({ length: 5 }, (_, index) => ({
+    title: titles[index] ?? "",
+    text: messages[index] ?? ""
+  }));
+};
+
+async function savedata(){
+  const baseConfig = appConfig ?? await storageProvider.read();
+  const currentTicker = baseConfig.config.ticker;
+
+  const nextConfig: AppConfig = {
+    info: { ...baseConfig.info, lastVersion: AppVersionView },
+    config: {
+      app: {
+        autoCopy: {
+          eew: getInputChecked("setClipEEW"),
+          quake: getInputChecked("setClipQuake")
         },
-        eew: {
-          intensity: (document.getElementsByName('eewminint')[0] as HTMLInputElement | undefined)?.value ?? "",
-          unknown: (document.getElementsByName('eewintunknown')[0] as HTMLInputElement | undefined)?.value ?? "",
-          magnitude: (document.getElementsByName('eewminmag')[0] as HTMLInputElement | undefined)?.value ?? "",
-          depth: (document.getElementsByName('eewdepmin')[0] as HTMLInputElement | undefined)?.value ?? ""
+        interval: {
+          ...baseConfig.config.app.interval,
+          iedred7584EEW: getValueAsNumber("setIntervalIedred"),
+          nhkQuake: elements.id.setIntervalNHKquake.valueAsNumber,
+          jmaDevFeed: elements.id.setIntervalJmaWt.valueAsNumber,
+          warnInfo: elements.id.setIntervalWarn.valueAsNumber,
+          tenkiJPtsunami: elements.id.setIntervalTenkiJpTsu.valueAsNumber,
+          typhComment: elements.id.setIntervalTyphCom.valueAsNumber,
+          wniMScale: elements.id.setIntervalWNImscale.valueAsNumber,
+          wniSorabtn: elements.id.setIntervalWNIsorabtn.valueAsNumber,
+          wniRiver: elements.id.setIntervalWNIriver.valueAsNumber,
         }
       },
-      clipboard: {
-        eew: getInputChecked("setClipEEW"),
-        quake: getInputChecked("setClipQuake")
-      },
-      interval: {
-        iedred7584EEW: getValueAsNumber("setIntervalIedred"),
-        nhkQuake: elements.id.setIntervalNHKquake.valueAsNumber,
-        jmaDevFeed: elements.id.setIntervalJmaWt.valueAsNumber,
-        warnInfo: elements.id.setIntervalWarn.valueAsNumber,
-        tenkiJPtsunami: elements.id.setIntervalTenkiJpTsu.valueAsNumber,
-        typhComment: elements.id.setIntervalTyphCom.valueAsNumber,
-        wniMScale: elements.id.setIntervalWNImscale.valueAsNumber,
-        wniSorabtn: elements.id.setIntervalWNIsorabtn.valueAsNumber,
-        wniRiver: elements.id.setIntervalWNIriver.valueAsNumber,
-      },
-      volume: {
-        eewL: [
-          getValueAsNumber("volEEWl1"),
-          getValueAsNumber("volEEWl5"),
-          getValueAsNumber("volEEWl9")
-        ],
-        eewH: getValueAsNumber("volEEWh"),
-        eewC: getValueAsNumber("volEEWc"),
-        eewP: getValueAsNumber("volEEWp"),
-        gl: getValueAsNumber("volGL"),
-        ntc: getValueAsNumber("volNtc"),
-        spW: getValueAsNumber("volSpW"),
-        tnm: getValueAsNumber("volTnm"),
-        hvra: getValueAsNumber('volHvRa'),
-        fldoc5: getValueAsNumber('volFldOc5'),
-        fldoc4: getValueAsNumber('volFldOc4'),
-        quake: []
-      },
-      gainPrograms: audioAPI.gainTimer,
-      speech: {
-        volume: getValueAsNumber("speech-vol-input"),
-        options: {
-          EEW: elements.id.speechCheckboxEEW.checked,
-          Quake: elements.id.speechCheckboxQuake.checked,
-          VPOA50: elements.id.speechCheckboxVPOA50.checked,
-          Ground: elements.id.speechCheckboxGround.checked,
-          SPwarn: elements.id.speechCheckboxSPwarn.checked,
-        }
-      },
-      theme: {
-        color: (document.getElementsByName("themeColors")[0] as HTMLInputElement | undefined)?.value ?? ""
-      },
-      style: 0
-    },
-    app: {
-      lastVer: AppVersionView,
-      newUser: false,
-      textSpeed
+      ticker: {
+        ...currentTicker,
+        normalTexts: buildNormalTextsFromInputs(),
+        newsText: {
+          ...currentTicker.newsText,
+          title: getInputValue('BNtitle'),
+          subtitle: getInputValue('BNtext1'),
+          text: getInputValue('BNtext2')
+        },
+        scrollSpeed: getValueAsNumber("speedVal"),
+        tsunamiPosition: toTsunamiPosition(elements.id.viewTsunamiType.value),
+        themeColor: {
+          ticker: Number((document.getElementsByName("themeColors")[0] as HTMLInputElement | undefined)?.value ?? currentTicker.themeColor.ticker ?? 0)
+        },
+        sfx: {
+          ...currentTicker.sfx,
+          eewBegin: getValueAsNumber("volEEWl1"),
+          eewContinue: getValueAsNumber("volEEWl5"),
+          eewEnd: getValueAsNumber("volEEWl9"),
+          eewHighBeep: getValueAsNumber("volEEWh"),
+          eewHighCustom: getValueAsNumber("volEEWc"),
+          eewPlum: getValueAsNumber("volEEWp"),
+          floodLevel4: getValueAsNumber("volFldOc4"),
+          floodLevel5: getValueAsNumber("volFldOc5"),
+          doshakeikai: getValueAsNumber("volGL"),
+          kirokuame: getValueAsNumber("volHvRa"),
+          nornadoNotice: getValueAsNumber("volNtc"),
+          level5Warning: getValueAsNumber("volSpW"),
+          tsunamiWarning: getValueAsNumber("volTnm")
+        },
+        speech: {
+          options: {
+            ...currentTicker.speech.options,
+            eew: elements.id.speechCheckboxEEW.checked,
+            quake: elements.id.speechCheckboxQuake.checked,
+            doshakeikai: elements.id.speechCheckboxGround.checked,
+            level5Warning: elements.id.speechCheckboxSPwarn.checked,
+            kirokuame: elements.id.speechCheckboxVPOA50.checked
+          },
+          volume: getValueAsNumber("speech-vol-input")
+        },
+        soraViewEnabled: getInputChecked('isSoraview'),
+        gainPrograms: audioAPI.gainTimer
+      }
     }
   };
-  // elements.class.sound_quake_volume.forEach((volume, i) => {
-  //   const type = elements.class.sound_quake_type[i];
-  //   data.settings.volume.quake.push({
-  //     volume: volume.value-0,
-  //     type: type.getAttribute("data-type")
-  //   });
-  // });
+
+  appConfig = nextConfig;
   lastSaveTime = Date.now();
-  chrome.storage.sync.set(data, function(){/* console.log("Data recorded.", data)*/});
+  await storageProvider.save(nextConfig);
 }
 
 function bit(number: any, bitL: any){
@@ -1615,7 +1602,6 @@ BigInt.prototype.byteToString = Number.prototype.byteToString;
 
 const safeGetFormattedDate = (...args: any[]) => (getFormattedDate as any)(...args);
 const safeRainWindData = (...args: any[]) => (rain_windData as any)(...args);
-const safeHumanReadable = (...args: any[]) => (humanReadable as any)(...args);
 const schemeColor = (groupIndex: number, colorIndex: number, fallback = "#000") => {
   return (colorScheme?.[colorThemeMode]?.[groupIndex]?.[colorIndex] ?? fallback) as string;
 };
@@ -1713,7 +1699,6 @@ const Routines = {
     const formattedNowSecond = safeGetFormattedDate(1)?.second ?? 0;
     if (formattedNowSecond === 50) t=0;
     if ((q_startTime % Math.floor(elements.id.setIntervalJmaWt.valueAsNumber/20)) === 1) weatherInfo();
-    if ((q_startTime % Math.floor(200)) == 1) safeHumanReadable();
     if ((q_startTime % 9000) === 1) getAmedasData();
     if ((q_startTime % 3000) === 1) getEvacuationData();
     if ((q_startTime % 225) === 1){
@@ -1729,7 +1714,6 @@ const Routines = {
     }
     timeCount++;
     q_startTime++;
-    p2p_elapsedTime++;
     switch (textCmdIds[viewingTextIndex]) {
       case 1:
         directTexts[viewingTextIndex] = weather_mxtemsadextstr;
@@ -2054,7 +2038,7 @@ const Routines = {
     Routines.memory.lastTime = currentTimeDate;
 
     // Auto Save
-    if (lastSaveTime + 30000 <= Date.now()) savedata();
+    if (lastSaveTime + 30000 <= Date.now()) void savedata();
     if (q_startTime % 10 === 0){
       const ratio = 100 - ((lastSaveTime - Date.now() + 30000) / 300);
       elements.id.dataSaverBox.style.background = "linear-gradient(90deg, #c5f6f9 " + ratio + "%, #ffffff " + ratio + "%)";
@@ -2298,9 +2282,9 @@ async function eewMapDraw(longitude: number, latitude: number, warnAreas: any[] 
   if (longitude>146) eewEpiPos[0] += (longitude-146)*3;
   let magnification = 1;
   try {
-    magnification = await connect2sandbox("quakemap_calc_magnification", { warn: warnAreas, lon: longitude, lat: latitude });
+    magnification = await calcMapZoom({ warn: warnAreas, lon: longitude, lat: latitude });
   } catch (error) {
-    console.warn("connect2sandbox unavailable; using magnification=1", error);
+    console.warn("calcMapZoom unavailable; using magnification=1", error);
   }
   lineWidth = 2.5/Math.max(magnification, 2.5);
   // console.log("magnification = "+magnification+"\n    lineWidth = "+lineWidth);
@@ -2310,7 +2294,7 @@ async function eewMapDraw(longitude: number, latitude: number, warnAreas: any[] 
   context.fillRect(905, 0, 175, 128);
   context.strokeStyle = colorThemeMode != 2 ? "#333" : "#aaa";
   context.lineWidth = lineWidth;
-  if (!JapanGeoJSON?.features) await loadJapanGeojson(connect2sandbox);
+
   const japanGeo = (JapanGeoJSON as any)?.features ?? [];
   japanGeo.forEach(function(int: any){
     if (warnAreas.includes(int.properties.code)) context.fillStyle = colorThemeMode != 2 ? "#fdab29" : "#ffed4a"; else context.fillStyle = colorThemeMode != 2 ? "#32a852" : "#666";
@@ -3547,9 +3531,6 @@ const SFXController = {
   }
 };
 
-var p2p_elapsedTime = 2405;
-function humanReadable(){}
-
 DataOperator.tsunami.onUpdate = (data, vtse41, vtse51) => {
   if (DataOperator.tsunami.isIssued){
     setTsunamiIssued(tsunamiOverlayState, data.text.head);
@@ -3940,112 +3921,88 @@ export const byteToString = (byte: bigint | number) => {
 };
 
 (async () => {
+  appConfig = await storageProvider.read();
+  const { config } = appConfig;
+  const ticker = config.ticker;
+  const intervals = config.app.interval ?? {};
+  const sfx = ticker.sfx;
+  const speech = ticker.speech;
 
-  // Chromeストレージ（設定）
-  await new Promise(resolve => {
-    chrome.storage.sync.get(['mode0', 'mode3', 'settings', 'app'], (data: any) => {
-      let isSaveForced = false;
-      let currentVerID = AppVersionHistory.indexOf(data.app.lastVer);
-      // Release note: 必ず追加すること
-      // console.log(JSON.stringify(c));
-      if ((!data.app) || data.app.newUser){
-        isSaveForced = true;
-      } else {
-        if (currentVerID === -1) alert(data.app.lastVer+" ってどのバージョンですか？？？？？？");
-        // if (data.app.lastVer !== AppVersionView) /* アップデート後初回起動 */ isSaveForced = true;
-        if (currentVerID <  3){ /* β0.1.2以前 */ if(data.settings.volume.eewH == 100){ alert("（ "+data.app.lastVer+" からのバージョンアップを検知しました）\n緊急地震速報(警報)時の音量を再確認し、必ず保存してください。"); }}
-        if (currentVerID < 13){ /* β0.2.5以前 */ data.settings.interval.wniRiver = Math.max(data.settings.interval.wniRiver, 120000); }
-        if (currentVerID < 15){ /* β0.2.7以前 */ data.settings.volume.eewC = 100;}
-        if (currentVerID < 16){ /* β0.2.8以前 */ data.settings.volume.fldoc5 = data.settings.volume?.fldoc ?? 100; data.settings.volume.fldoc4 = 100; data.settings.volume.gl = 100; isSaveForced = true; }
-        if (currentVerID < 22){ /* β0.3.4以前 */ data.settings.volume.eewL = [ data.settings.volume.eewL, data.settings.volume.eewL, data.settings.volume.eewL ] }
-        // if (currentVerID < 23){ /* β0.4.0以前 */ alert(data.app.lastVer+" からのバージョンアップを検知しました。\nカスタム音声の場所が、 EEW_Warning.（以下省略） → 「eew-custom.mp3」のみに変更されています。\nカスタム音声を使用している場合、手動で名前を変更するようにお願いします。"); }
-      }
+  const setInputValue = (id: string, value: string | number) => {
+    const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (el) el.value = String(value);
+  };
+  const setCheckbox = (id: string, value: boolean) => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (el) el.checked = value;
+  };
 
-      data.settings.volume.eewP ??= 100
-      data.settings.volume.hvra ??= 100
-      data.settings.volume.fldoc5 ??= 100
-      data.settings.volume.fldoc4 ??= 100
-      const setInputValue = (id: string, value: string | number) => {
-        const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
-        if (el) el.value = String(value);
-      };
-      const setCheckbox = (id: string, value: boolean) => {
-        const el = document.getElementById(id) as HTMLInputElement | null;
-        if (el) el.checked = value;
-      };
-      setInputValue('message1', data.mode0.main[0]);
-      setInputValue('message2', data.mode0.main[1]);
-      setInputValue('message3', data.mode0.main[2]);
-      setInputValue('message4', data.mode0.main[3]);
-      setInputValue('message5', data.mode0.main[4]);
-      setInputValue('title1', data.mode0.title[0]);
-      setInputValue('title2', data.mode0.title[1]);
-      setInputValue('title3', data.mode0.title[2]);
-      setInputValue('title4', data.mode0.title[3]);
-      setInputValue('title5', data.mode0.title[4]);
-      setInputValue('BNtitle', data.mode3[0]);
-      setInputValue('BNtext1', data.mode3[1]);
-      setInputValue('BNtext2', data.mode3[2]);
-      changeTextSpeed(data.settings?.tickerSpeed ?? 5);
-      setCheckbox('isSoraview', data.settings.soraview);
-      setCheckbox('setClipEEW', data.settings.clipboard.eew);
-      setCheckbox('setClipQuake', data.settings.clipboard.quake);
-      setInputValue('setIntervalIedred', data.settings.interval.iedred7584EEW);
-      setInputValue('setIntervalNHKquake', data.settings.interval.nhkQuake);
-      setInputValue('setIntervalJmaWt', data.settings.interval.jmaDevFeed);
-      setInputValue('setIntervalTenkiJpTsu', data.settings.interval.tenkiJPtsunami);
-      setInputValue('setIntervalTyphCom', data.settings.interval?.typhComment ?? 30000);
-      setInputValue('setIntervalWarn', data.settings.interval?.warnInfo ?? 15000);
-      setInputValue('setIntervalWNImscale', data.settings.interval.wniMScale);
-      setInputValue('setIntervalWNIsorabtn', data.settings.interval.wniSorabtn);
-      setInputValue('setIntervalWNIriver', data.settings.interval.wniRiver);
-      setInputValue('volEEWl1', data.settings.volume.eewL[0]);
-      setInputValue('volEEWl5', data.settings.volume.eewL[1]);
-      setInputValue('volEEWl9', data.settings.volume.eewL[2]);
-      setInputValue('volEEWh', data.settings.volume.eewH);
-      setInputValue('volEEWc', data.settings.volume.eewC);
-      setInputValue('volEEWp', data.settings.volume.eewP);
-      setInputValue('volGL', data.settings.volume.gl);
-      setInputValue('volNtc', data.settings.volume.ntc);
-      setInputValue('volSpW', data.settings.volume.spW);
-      setInputValue('volTnm', data.settings.volume.tnm);
-      setInputValue('volHvRa', data.settings.volume.hvra);
-      setInputValue('volFldOc5', data.settings.volume.fldoc5);
-      setInputValue('volFldOc4', data.settings.volume.fldoc4);
+  const normalTexts = ticker.normalTexts.length ? ticker.normalTexts : Array.from({ length: 5 }, () => ({ title: "", text: "" }));
+  normalTexts.slice(0, 5).forEach((item, index) => {
+    setInputValue(`message${index + 1}`, item?.text ?? "");
+    setInputValue(`title${index + 1}`, item?.title ?? "");
+  });
 
-      elements.id.speechVolInput.value = String(data.settings?.speech?.volume ?? 1);
-      elements.id.speechCheckboxEEW.checked = data.settings?.speech?.options?.EEW ?? true;
-      elements.id.speechCheckboxQuake.checked = data.settings?.speech?.options?.Quake ?? true;
-      elements.id.speechCheckboxVPOA50.checked = data.settings?.speech?.options?.VPOA50 ?? true;
-      elements.id.speechCheckboxGround.checked = data.settings?.speech?.options?.Ground ?? true;
-      elements.id.speechCheckboxSPwarn.checked = data.settings?.speech?.options?.SPwarn ?? true;
+  const newsText = ticker.newsText ?? { title: "", subtitle: "", text: "" };
+  setInputValue('BNtitle', newsText.title ?? "");
+  setInputValue('BNtext1', newsText.subtitle ?? "");
+  setInputValue('BNtext2', newsText.text ?? "");
 
-      const viewTsunamiType = document.getElementById("viewTsunamiType") as HTMLSelectElement;
-      viewTsunamiType.value = data.settings.viewTsunamiType || "1";
-      t_viewType = Number(viewTsunamiType.value);
+  changeTextSpeed(ticker.scrollSpeed ?? 5);
+  setCheckbox('isSoraview', ticker.soraViewEnabled ?? false);
+  setCheckbox('setClipEEW', config.app.autoCopy.eew ?? false);
+  setCheckbox('setClipQuake', config.app.autoCopy.quake ?? false);
+  setInputValue('setIntervalIedred', intervals.iedred7584EEW ?? 3000);
+  setInputValue('setIntervalNHKquake', intervals.nhkQuake ?? 8500);
+  setInputValue('setIntervalJmaWt', intervals.jmaDevFeed ?? 8500);
+  setInputValue('setIntervalTenkiJpTsu', intervals.tenkiJPtsunami ?? 25000);
+  setInputValue('setIntervalTyphCom', intervals.typhComment ?? 30000);
+  setInputValue('setIntervalWarn', intervals.warnInfo ?? 15000);
+  setInputValue('setIntervalWNImscale', intervals.wniMScale ?? 30000);
+  setInputValue('setIntervalWNIsorabtn', intervals.wniSorabtn ?? 30000);
+  setInputValue('setIntervalWNIriver', intervals.wniRiver ?? 300000);
+  setInputValue('volEEWl1', sfx.eewBegin ?? 100);
+  setInputValue('volEEWl5', sfx.eewContinue ?? 100);
+  setInputValue('volEEWl9', sfx.eewEnd ?? 100);
+  setInputValue('volEEWh', sfx.eewHighBeep ?? 12);
+  setInputValue('volEEWc', sfx.eewHighCustom ?? 100);
+  setInputValue('volEEWp', sfx.eewPlum ?? 100);
+  setInputValue('volGL', sfx.doshakeikai ?? 100);
+  setInputValue('volNtc', sfx.nornadoNotice ?? 100);
+  setInputValue('volSpW', sfx.level5Warning ?? 100);
+  setInputValue('volTnm', sfx.tsunamiWarning ?? 100);
+  setInputValue('volHvRa', sfx.kirokuame ?? 100);
+  setInputValue('volFldOc5', sfx.floodLevel5 ?? 100);
+  setInputValue('volFldOc4', sfx.floodLevel4 ?? 100);
+  sfx.quake?.forEach((volume, index) => {
+    const volumeInput = elements.class.sound_quake_volume[index];
+    if (volumeInput) volumeInput.value = String(volume);
+  });
 
-      elements.id.speechVolView.textContent = (data.settings?.speech?.volume ?? 1) * 100 + "%";
-      (document.getElementsByName("themeColors")[0] as HTMLInputElement).value = String(data.settings?.theme?.color ?? 0);
-      if (data.settings.volume.quake){
-        data.settings.volume.quake.forEach((item: { volume: number; type: string }, i: number) => {
-          const volumeInput = elements.class.sound_quake_volume[i];
-          const typeCell = elements.class.sound_quake_type[i];
-          if (volumeInput) volumeInput.value = String(item.volume);
-          if (typeCell) typeCell.setAttribute("data-type", item.type);
-        });
-      }
-      setColorThemeMode(data.settings?.theme?.color ?? 0);
-      audioAPI.setGainTimer(data.settings?.gainPrograms ?? []);
+  elements.id.speechVolInput.value = String(speech?.volume ?? 1);
+  elements.id.speechCheckboxEEW.checked = speech?.options?.eew ?? true;
+  elements.id.speechCheckboxQuake.checked = speech?.options?.quake ?? true;
+  elements.id.speechCheckboxVPOA50.checked = speech?.options?.kirokuame ?? true;
+  elements.id.speechCheckboxGround.checked = speech?.options?.doshakeikai ?? true;
+  elements.id.speechCheckboxSPwarn.checked = speech?.options?.level5Warning ?? true;
 
-      if(isSaveForced) savedata();
-      sorabtnState.isSoraview = data.settings.soraview;
-      audioAPI.gainNode.gain.value = data.settings.volume.eewH / 100;
-      document.addEventListener("DOMContentLoaded", () => {
-        // console.log("DOMContentLoaded");
-        reflectNormalMsg();
-      });
-      resolve(undefined);
-    });
+  const viewTsunamiType = document.getElementById("viewTsunamiType") as HTMLSelectElement;
+  viewTsunamiType.value = fromTsunamiPosition(ticker.tsunamiPosition);
+  t_viewType = Number(viewTsunamiType.value);
+
+  elements.id.speechVolView.textContent = ((speech?.volume ?? 1) * 100).toFixed() + "%";
+  (document.getElementsByName("themeColors")[0] as HTMLInputElement).value = String(ticker.themeColor?.ticker ?? 0);
+  setColorThemeMode(ticker.themeColor?.ticker ?? 0);
+  audioAPI.setGainTimer(ticker.gainPrograms ?? []);
+
+  const isSaveForced = appConfig.info.lastVersion !== AppVersionView;
+  if (isSaveForced){
+    await savedata();
+  }
+  sorabtnState.isSoraview = ticker.soraViewEnabled ?? false;
+  audioAPI.gainNode.gain.value = (sfx.eewHighBeep ?? 100) / 100;
+  document.addEventListener("DOMContentLoaded", () => {
+    reflectNormalMsg();
   });
 
   const isSoundLeaf = (value: SoundLeaf | SoundTree): value is SoundLeaf => {
@@ -4291,7 +4248,7 @@ addClickListener("speech-test1", function (){
   ])
 });
 
-addClickListener("dataSaver", () => { savedata(); });
+addClickListener("dataSaver", () => { void savedata(); });
 addClickListener("unitsReflect", () => {rain_windData(true);});
 document.getElementsByName("themeColors")[0].addEventListener('change', function (){ setColorThemeMode(Number((document.getElementsByName("themeColors")[0] as HTMLInputElement).value)); if(viewMode === 0){ Routines.md0title(); }; Routines.subCanvasTime(getAdjustedDate()); });
 ["setIntervalIedred","setIntervalNHKquake","setIntervalJmaWt","setIntervalWarn","setIntervalTenkiJpTsu","setIntervalTyphCom","setIntervalWNImscale","setIntervalWNIsorabtn","setIntervalWNIriver","setIntervalTpcBlackOut"].forEach(clampInputRange);
