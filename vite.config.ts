@@ -1,6 +1,6 @@
+import path from "node:path";
 import { crx, defineManifest } from "@crxjs/vite-plugin";
-import { defineConfig } from "vite";
-import topLevelAwait from "vite-plugin-top-level-await";
+import { defineConfig, Plugin } from "vite";
 
 const manifest = defineManifest({
   manifest_version: 3,
@@ -53,6 +53,9 @@ const manifest = defineManifest({
       "https://smtgvs.weathernews.jp/a/solive_timetable/timetable.json",
       "https://md-ndv356.github.io/ndv-tickers/*"
   ],
+  content_security_policy: {
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  }
   // commands: {
   //   main_window_open: {
   //     suggested_key: {
@@ -68,27 +71,51 @@ const manifest = defineManifest({
   // key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs2qC/KZW8IjyRyqlOh1TMmeWOALdvCuEaeXDntStMrDfI050baiS8kQO4JiUmDjQXKVK8JlUcqtNcSr67TnQUcoVk5qyLVxmsBz6mLDhmaAxfVU3LXjLJj71GVptF4d9A45Ughijktjp0IZ01pxCesk2DjR9kj6QbL0r4ksreyYN7Ugdkjfr0Aoxi0sneDkyz4lxXkmXIhZCx/IodnmjA9vY/mE2wUFbp0O6Je08lu6/N+pmFOHH2aDWgeJcmPShC3sgCO1xj8xzc5/zdttCr+D639wm/r8cZiH0lQ909IHAgqKUF42xqgMpwdPWUmtrGA/7cljM9kaHIJoaqATmHQIDAQAB"
 });
 
+// const ensureSourceMappingUrl: Plugin = {
+//   name: "ensure-sourcemap-url",
+//   enforce: "post",
+//   generateBundle(_options, bundle) {
+//     Object.entries(bundle).forEach(([fileName, output]) => {
+//       if (output.type !== "chunk") return;
+//       const mapName = `${fileName}.map`;
+//       if (!bundle[mapName]) return;
+//       if (output.code.includes("sourceMappingURL=")) return;
+//       const mapBasename = path.basename(mapName);
+//       output.code += `\n//# sourceMappingURL=${mapBasename}`;
+//     });
+//   }
+// };
+
 export default defineConfig({
   publicDir: "src/public",
   build: {
+    minify: "esbuild",
+    target: "esnext",
     sourcemap: true,
     emptyOutDir: true,
     rollupOptions: {
       input: {
         background: "src/background/index.ts",
         popup: "src/popup/index.html",
-        sandbox: "src/popup/sandbox.html",
+        // sandbox: "src/popup/sandbox.html",
         "disp-commands": "src/disp-commands/index.html"
       },
+      output: {
+        manualChunks: {
+          jszip: ["jszip"]
+        }
+      }
       // output: {
       //   entryFileNames: `src/[name].js`,
       //   chunkFileNames: `src/[name]-[hash].js`,
       //   assetFileNames: `src/[name]-[hash].[ext]`
       // }
-    }
+    },
+    chunkSizeWarningLimit: 2000
   },
   plugins: [
     crx({ manifest }),
-    topLevelAwait(),
+    // topLevelAwait(),
+    // ensureSourceMappingUrl,
   ]
 });
