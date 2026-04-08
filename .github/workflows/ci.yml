@@ -12,10 +12,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      - name: Use Node.js
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '24.x'
+
       - run: npm ci
       - run: npm run build
       # - run: npm test
