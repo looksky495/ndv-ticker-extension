@@ -110,15 +110,30 @@ window.resizeTo(1240 * window.outerWidth / window.innerWidth, window.outerHeight
 const Data = {};
 void Data;
 
-// プラットフォームに合わせて最大化時のフレーム幅を調整
-let PlatformOS = null;
-let Window_FrameWidth = 0;
-let Window_FrameHeight = window.outerHeight - window.innerHeight * window.outerWidth / window.innerWidth;
-chrome.runtime.getPlatformInfo().then(info => {
-  PlatformOS = info.os;
-  Window_FrameWidth = PlatformOS === "win" ? 16 : 0;
-  Window_FrameHeight = window.outerHeight - window.innerHeight * (window.outerWidth - Window_FrameWidth) / window.innerWidth;
-});
+/**
+ * ウィンドウの表示拡大倍率を取得します。
+ * @returns ウィンドウの表示拡大倍率
+ */
+async function getWindowZoom (): Promise<number> {
+  const windowId = await chrome.windows.getCurrent().then(win => win.id);
+  if (windowId === void 0) throw new Error("Failed to get current window ID.");
+
+  const zoom = await chrome.tabs.getZoom();
+  return zoom;
+}
+
+/**
+ * ウィンドウのサイズを内容に合わせてリサイズします。
+ * @param width 期待される innerWidth
+ * @param height 期待される innerHeight
+ */
+async function resizeToContent (width: number, height: number): Promise<void> {
+  const zoom = await getWindowZoom();
+  const windowEdgeWidth = window.outerWidth - window.innerWidth * zoom;
+  const windowEdgeHeight = window.outerHeight - window.innerHeight * zoom;
+
+  window.resizeTo(Math.ceil(width * zoom + windowEdgeWidth), Math.ceil(height * zoom + windowEdgeHeight));
+}
 
 // バージョン表示
 document.getElementById("dbTickerVersion")!.textContent = "Ticker Version: "+AppVersionCode+" ("+AppVersionView+")";
@@ -501,7 +516,7 @@ var textSpeed = 5,
     textCmdIds = [1,2,11,13,20],
     textCount = 5,
     viewingTextIndex = 0,
-    heightBeforeFull = 0;
+    outerHeightRecord = 0; // 最大化前のウィンドウの高さを記録するための変数
 
   let appConfig: AppConfig | null = null;
 
@@ -1502,11 +1517,11 @@ void quake;
 
 document.onkeydown = keydown;
 function keydown(event: KeyboardEvent){
-  if (heightBeforeFull && document.body.classList.contains("fullview") && (event.code === "KeyQ" || event.code === "Escape")){
+  if (outerHeightRecord && document.body.classList.contains("fullview") && (event.code === "KeyQ" || event.code === "Escape")){
     document.getElementsByClassName("canvas-container")[0].classList.remove("fullview");
     document.body.classList.remove("fullview");
 
-    window.resizeTo(1240 * window.outerWidth / window.innerWidth, heightBeforeFull);
+    window.resizeTo(1240 * window.outerWidth / window.innerWidth, outerHeightRecord);
   }
 }
 
@@ -4151,16 +4166,13 @@ document.getElementsByName("goMessage")[0].addEventListener('click', function(){
   textOffsetX = 1200;
   timeCount = 217;
 });
-addClickListener("into-fullscreen", () => {
-  const ratio = (window.outerWidth-Window_FrameWidth)/window.innerWidth;
+addClickListener("into-fullscreen", async () => {
+  await resizeToContent(1212, 128);
+
   document.getElementsByClassName("canvas-container")[0].classList.add("fullview");
   document.body.classList.add("fullview");
-  heightBeforeFull = window.outerHeight;
+  outerHeightRecord = window.outerHeight;
 
-  window.resizeTo(
-    Math.floor(1212 * ratio + Window_FrameWidth),
-    Math.floor(128 * ratio + Window_FrameHeight)
-  );
   anim_fullscreen.start();
 });
 

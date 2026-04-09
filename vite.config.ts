@@ -11,7 +11,8 @@ const manifest = defineManifest({
   permissions: [
     "background",
     "storage",
-    "identity"
+    "identity",
+    "tabs"
   ],
   action: {
     default_icon: {
