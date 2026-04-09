@@ -1,4 +1,4 @@
-import { AreaCode2Epicenter, AreaForecastLocalE } from '../data/japan.ts';
+import { AreaCode2Epicenter, AreaForecastLocalE } from '../dictionaries/japan.ts';
 import { AreaForecastLocalM } from './data-AreaForecastLocalM.ts';
 
 import JSZip from 'jszip';

@@ -1,13 +1,14 @@
 'use strict';
 
 import './uncategorized/prototype-extension.ts';
-import { RequestURL } from './data/requestURL.ts';
-import './data/jmaDataOperator.ts';
-import { getRiverPoints } from './data/riverPoints.ts';
-import { multilingualQuake } from './data/multilingual-quake.ts';
+import { RequestURL } from './config/requestURL.ts';
+import { DataOperator } from './services/jmaDataOperator.ts';
+import { TrafficTracker } from "./services/TrafficTracker.ts";
+import { getRiverPoints } from './services/riverPoints.ts';
+import { multilingualQuake } from './dictionaries/multilingual-quake.ts';
 import { AreaForecastLocalM } from './uncategorized/data-AreaForecastLocalM.ts';
 import { epicenter_list } from './uncategorized/data-epicenter.ts';
-import { AreaForecastLocalE, AreaEpicenter2Code, OfficeID2PrefName, JapanGeoJSON } from './data/japan.ts';
+import { AreaForecastLocalE, AreaEpicenter2Code, OfficeID2PrefName, JapanGeoJSON } from './dictionaries/japan.ts';
 import { AudioSpeechController, AudioSpeaker } from './uncategorized/init-speechController.ts';
 import type { AudioSpeechQueueParam } from './uncategorized/init-speechController.ts';
 import { renderQuakeView, quakeRenderState, prepareQuakeState } from './routines/quakeView.ts';
@@ -18,7 +19,7 @@ import { advanceTsunamiPage, createTsunamiOverlayState, renderTsunamiOverlay, se
 import { VariableAnimation } from './uncategorized/variable-animation.ts';
 import { calcMapZoom } from './uncategorized/init-wasm.ts';
 import { canvas1, context, time } from './uncategorized/init-canvas.ts';
-import { FontFamilies, colorScheme, colorThemeMode, setColorThemeMode } from './uncategorized/config.ts';
+import { FontFamilies, colorScheme, colorThemeMode, setColorThemeMode } from './config/config.ts';
 import { loadFonts } from './uncategorized/init-fontOperator.ts';
 import type { AppConfig, NormalText, tsunamiPositionStyle } from '../shared/storage.ts';
 import * as storageProvider from "../shared/storage.ts";

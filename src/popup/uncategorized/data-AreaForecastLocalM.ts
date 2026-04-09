@@ -462,6 +462,3 @@ export const AreaForecastLocalM = {
     "47": "沖縄県",
   }
 };
-
-// Preserve global for legacy scripts still expecting AreaForecastLocalM on window.
-(globalThis as any).AreaForecastLocalM = AreaForecastLocalM;
