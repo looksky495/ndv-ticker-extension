@@ -2,7 +2,7 @@
 
 import './uncategorized/prototype-extension.ts';
 import { RequestURL } from './config/requestURL.ts';
-import { DataOperator } from './services/jmaDataOperator.ts';
+import { DataOperator } from './services/jma/jmaDataOperator.ts';
 import { TrafficTracker } from "./services/TrafficTracker.ts";
 import { getRiverPoints } from './services/riverPoints.ts';
 import { multilingualQuake } from './dictionaries/multilingual-quake.ts';
@@ -1087,7 +1087,8 @@ const sorabtn_qr_img = new Image() as TextureImageWithBitmap;
   const textPaths = import.meta.glob('/src/assets/image/**/*.png', { query: "?url", import: "default", eager: true }) as Record<string, string>;
 
   const onImageLoaded = (ev: Event) => {
-    console.log(ev);
+    // @ts-ignore
+    console.log("onImageLoaded", ev.target?.src);
     const target = ev.currentTarget as TextureImageWithBitmap | null;
     if (!target) return;
     if (!("imgBmp" in target)) target.imgBmp = undefined;
@@ -1096,8 +1097,8 @@ const sorabtn_qr_img = new Image() as TextureImageWithBitmap;
     });
   };
   sorabtn_qr_img.addEventListener("load", onImageLoaded); sorabtn_qr_img.src = textPaths["/src/assets/image/sorabtn.png"];
-  images.eew.fc.addEventListener("load", onImageLoaded); images.eew.fc.src = textPaths["/src/assets/image/eew1234.png"];
-  images.eew.pub.addEventListener("load", onImageLoaded); images.eew.pub.src = textPaths["/src/assets/image/eew567.png"];
+  images.eew.fc.addEventListener("load", onImageLoaded); images.eew.fc.src = textPaths["/src/assets/image/EEW1234.png"];
+  images.eew.pub.addEventListener("load", onImageLoaded); images.eew.pub.src = textPaths["/src/assets/image/EEW567.png"];
   images.eew.cancel.addEventListener("load", onImageLoaded); images.eew.cancel.src = textPaths["/src/assets/image/eewCancelled.png"];
   for (let i=0; i<3; i++) for (let j=0; j<3; j++) {
     const img = images.quake.title[i][j];
@@ -4167,11 +4168,11 @@ document.getElementsByName("goMessage")[0].addEventListener('click', function(){
   timeCount = 217;
 });
 addClickListener("into-fullscreen", async () => {
+  outerHeightRecord = window.outerHeight;
   await resizeToContent(1212, 128);
 
   document.getElementsByClassName("canvas-container")[0].classList.add("fullview");
   document.body.classList.add("fullview");
-  outerHeightRecord = window.outerHeight;
 
   anim_fullscreen.start();
 });
