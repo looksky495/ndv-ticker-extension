@@ -1,8 +1,6 @@
 // Global declarations for legacy popup scripts loaded via index.html.
 // Keep this lightweight; refine types as modules are migrated to TypeScript.
 
-import type { DataOperatorPublic, TsunamiOperator, TyphCommentOperator, WarnCurrentOperator, TrafficTracker as TrafficTrackerClass } from '../popup/data/jmaDataOperator.ts';
-
 // Quake list samples: db/20240101_quake/quake_list1.json, db/20240101_quake/quake_list2.json,
 // db/20240808_quake/quakelist.json, db/jma_quake/list.json
 export type QuakeCityIntensity = {
@@ -301,27 +299,3 @@ export type JmaQuakeReport = {
   Head: JmaQuakeHead;
   Body: JmaQuakeBody;
 };
-
-declare global {
-  // Canvas context defined in init-canvas.js
-  const context: CanvasRenderingContext2D;
-
-  // Objects provided by other legacy scripts
-  const DataOperator: DataOperatorPublic;
-  const tsunami: TsunamiOperator;
-  const typh_comment: TyphCommentOperator;
-  const warn_current: WarnCurrentOperator;
-  const TrafficTracker: typeof TrafficTrackerClass;
-
-  interface CanvasRenderingContext2D {
-    // Custom renderer attached elsewhere
-    drawTextureImage?: (type: string, x: number, y: number, option?: any) => void;
-  }
-
-  interface HTMLImageElement {
-    toImageData?: () => ImageData;
-    imgBmp?: ImageBitmap;
-  }
-}
-
-export {};
