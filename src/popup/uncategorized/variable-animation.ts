@@ -63,7 +63,7 @@ export class VariableAnimation {
   }
 
   current (): number {
-    if (this.startTime === NOT_STARTED){
+    if (this.startTime === NOT_STARTED && this.type !== "Normal"){
       return this.isInt ? Math.floor(this.#start_n) : this.#start_n;
     }
 
