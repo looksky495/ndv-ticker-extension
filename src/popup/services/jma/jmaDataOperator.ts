@@ -1,9 +1,9 @@
 import type { AreaOperator } from "./common.ts";
 import { createAreaOperator } from "./common.ts";
-import { createEarthquakeOperator, type EarthquakeOperator } from "./earthquake.ts";
-import { createTsunamiOperator, type TsunamiOperator } from "./tsunami.ts";
-import { createTyphCommentOperator, type TyphCommentOperator } from "./typhoon.ts";
-import { createWarnCurrentOperator, type WarnCurrentOperator } from "./warning.ts";
+import { EarthquakeOperator } from "./earthquake.ts";
+import { TsunamiOperator } from "./tsunami.ts";
+import { TyphCommentOperator } from "./typhoon.ts";
+import { WarnCurrentOperator } from "./warning.ts";
 
 export type DataOperatorType = {
   area: AreaOperator;
@@ -17,10 +17,10 @@ const area = createAreaOperator();
 
 const DataOperator: DataOperatorType = {
   area,
-  tsunami: createTsunamiOperator(),
-  earthquake: createEarthquakeOperator(),
-  typh_comment: createTyphCommentOperator(),
-  warn_current: createWarnCurrentOperator(area)
+  tsunami: new TsunamiOperator(),
+  earthquake: new EarthquakeOperator(),
+  typh_comment: new TyphCommentOperator(),
+  warn_current: new WarnCurrentOperator(area)
 };
 
 export { DataOperator };

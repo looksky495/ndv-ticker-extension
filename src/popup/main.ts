@@ -1699,7 +1699,7 @@ const Routines = {
     const tsunamiExpire = DataOperator.tsunami.expire;
     if (DataOperator.tsunami.isIssued && tsunamiExpire <= targetTimeInt){
       DataOperator.tsunami.isIssued = false;
-      DataOperator.tsunami.onUpdate?.(); // isIssued = false なので引数なくてもok
+      handleTsunamiUpdate(DataOperator.tsunami);
     }
 
     if (viewMode !== 3) textOffsetX -= textSpeed;
@@ -3548,10 +3548,8 @@ const SFXController = {
   }
 };
 
-DataOperator.tsunami.onUpdate = (data, vtse41, vtse51) => {
+const handleTsunamiUpdate = (data: typeof DataOperator.tsunami, vtse41?: string, vtse51?: string) => {
   if (DataOperator.tsunami.isIssued){
-    if (data === void 0) throw new Error("Tsunami data is required.");
-
     setTsunamiIssued(tsunamiOverlayState, data.text.head);
     updateTsunamiList({
       element: elements.id.tsunamiList,
@@ -3586,17 +3584,19 @@ DataOperator.tsunami.onUpdate = (data, vtse41, vtse51) => {
     Routines.md0title();
   }
 };
-DataOperator.typh_comment.onUpdate = data => {
+DataOperator.tsunami.subscribe("report", handleTsunamiUpdate);
+
+DataOperator.typh_comment.subscribe("report", data => {
   commandShortcuts[55] = "";
   for (const item of Object.values(data.data)){
     if (item.number){
       commandShortcuts[55] += "【台風" + item.number + "号】  " + item.comment;
     }
   }
-};
-DataOperator.warn_current.onUpdate = data => {
+});
+DataOperator.warn_current.subscribe("report", data => {
   commandShortcuts[60] = data;
-};
+});
 
 function quakeTemplateView(viewId: number){
   //siHtem = Number(document.getElementById("template").options[document.getElementById("template").selectedIndex].value);
