@@ -1,7 +1,7 @@
 import { AreaCode2Epicenter, AreaForecastLocalE } from '../dictionaries/japan.ts';
-import { AreaForecastLocalM } from './data-AreaForecastLocalM.ts';
+import { AreaForecastLocalM } from '../dictionaries/AreaForecastLocalM.ts';
 
-import JSZip from 'jszip';
+import { BlobReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js";
 
 export type AudioSpeechQueueParam =
   | { type: "direct"; data: AudioBuffer; gain?: number }
@@ -17,11 +17,6 @@ type AudioSpeechQueueItem =
 
 // 2つ同時に鳴らせるようにするのも考えたけど、よく考えたら2つ同時に鳴らす意味なかった
 export class AudioSpeechController extends EventTarget {
-  /**
-   * @typedef {({ type: "direct", data: AudioBuffer, gain?: Number } | { type: "path", path: String, speakerId: String, gain?: Number } | { type: "id", id: String } | { type: "skip" } | { type: "wait", time: Number })} AudioSpeechQueueParam
-   * @typedef {({ type: "direct", data: AudioBuffer, gain: Number } | { type: "id", id: String } | { type: "skip" } | { type: "wait", time: Number })} AudioSpeechQueueItem
-   */
-
   static displayName = "AudioSpeechController";
   constructor (){
     super();
@@ -324,51 +319,65 @@ export class AudioSpeechController extends EventTarget {
    * @param {AudioContext} audioContext
    */
   async #initSpeaker (audioContext: BaseAudioContext){
-    const ZipData: Record<string, JSZip> = {};
-    for (const speaker of this.#speakers){
-      if (speaker.isAvaliable){
-        ZipData[speaker.id] = await (new Promise<ArrayBuffer>((resolve) => {
-          const xhr: XMLHttpRequest & { requestFileName?: string } = new XMLHttpRequest();
-          xhr.addEventListener("load", () => {
-            resolve(xhr.response);
+    const zipReaders: Record<string, ZipReader<BlobReader>> = {};
+    const zipEntries: Record<string, Record<string, any>> = {};
+    try {
+      for (const speaker of this.#speakers){
+        if (speaker.isAvaliable){
+          const zipArrayBuffer = await new Promise<ArrayBuffer>((resolve) => {
+            const xhr: XMLHttpRequest & { requestFileName?: string } = new XMLHttpRequest();
+            xhr.addEventListener("load", () => {
+              resolve(xhr.response);
+            });
+            xhr.addEventListener("progress", event => {
+              if (event.lengthComputable){
+                this.#speechStatusEvent(this.speechStatus.LOAD_FILE_PROGRESS, xhr.requestFileName + " (" + (event.loaded / 1000000).toFixed(1) + " / " + (event.total / 1000000).toFixed(1) + " MB)");
+              }
+            });
+            xhr.requestFileName = speaker.id + "@" + speaker.version + ".zip";
+            xhr.open("GET", "https://md-ndv356.github.io/ndv-tickers/synthesized-speech/" + xhr.requestFileName);
+            xhr.responseType = "arraybuffer";
+            this.#speechStatusEvent(this.speechStatus.LOAD_FILE_PROGRESS, xhr.requestFileName);
+            xhr.send();
           });
-          xhr.addEventListener("progress", event => {
-            if (event.lengthComputable){
-              this.#speechStatusEvent(this.speechStatus.LOAD_FILE_PROGRESS, xhr.requestFileName + " (" + (event.loaded / 1000000).toFixed(1) + " / " + (event.total / 1000000).toFixed(1) + " MB)");
-            }
-          });
-          xhr.requestFileName = speaker.id + "@" + speaker.version + ".zip";
-          xhr.open("GET", "https://md-ndv356.github.io/ndv-tickers/synthesized-speech/" + xhr.requestFileName);
-          xhr.responseType = "arraybuffer";
-          this.#speechStatusEvent(this.speechStatus.LOAD_FILE_PROGRESS, xhr.requestFileName);
-          xhr.send();
-        })).then(ab => JSZip.loadAsync(ab, { createFolders: false }));
+          const zipReader = new ZipReader(new BlobReader(new Blob([zipArrayBuffer], { type: "application/zip" })));
+          zipReaders[speaker.id] = zipReader;
+          const entries = await zipReader.getEntries();
+          zipEntries[speaker.id] = Object.fromEntries(entries.map(entry => [entry.filename, entry]));
+        }
       }
-    }
 
-    this.#speechStatusEvent(this.speechStatus.START_DECODING);
-    const propLoop = async (parent: Record<string, any>, propName: string, prefix: string) => {
-      const target = parent[propName];
-      if (target instanceof Object){
-        for (const item of Object.keys(target)){
-          await propLoop(target, item, prefix + propName + ".");
-        }
-      } else {
-        const audioDataAll: Record<string, AudioBuffer> = {};
-        for (const speakerData of this.#speakers){
-          if (speakerData.isAvaliable){
-            const zip = ZipData[speakerData.id];
-            const file = zip?.file(speakerData.id + "/" + target);
-            if (!file) continue;
-            const arrayBuffer = await file.async("arraybuffer");
-            const decodedAudio = await audioContext.decodeAudioData(arrayBuffer);
-            audioDataAll[speakerData.id] = decodedAudio;
+      this.#speechStatusEvent(this.speechStatus.START_DECODING);
+      const propLoop = async (parent: Record<string, any>, propName: string, prefix: string) => {
+        const target = parent[propName];
+        if (target instanceof Object){
+          for (const item of Object.keys(target)){
+            await propLoop(target, item, prefix + propName + ".");
           }
+        } else {
+          const audioDataAll: Record<string, AudioBuffer> = {};
+          for (const speakerData of this.#speakers){
+            if (speakerData.isAvaliable){
+              const filePath = speakerData.id + "/" + target;
+              const entry = zipEntries[speakerData.id]?.[filePath];
+              if (!entry || entry.directory) continue;
+              const uint8Array = await entry.getData(new Uint8ArrayWriter());
+              const arrayBuffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength);
+              const decodedAudio = await audioContext.decodeAudioData(arrayBuffer);
+              audioDataAll[speakerData.id] = decodedAudio;
+            }
+          }
+          this.#sources[prefix + propName] = { url: target, audioData: audioDataAll };
         }
-        this.#sources[prefix + propName] = { url: target, audioData: audioDataAll };
+      };
+      for (const item of Object.keys(this.#urls)) await propLoop(this.#urls, item, "");
+    } finally {
+      const closeTasks: Promise<void>[] = [];
+      for (const zipReader of Object.values(zipReaders)){
+        closeTasks.push(zipReader.close());
       }
-    };
-    for (const item of Object.keys(this.#urls)) await propLoop(this.#urls, item, "");
+      await Promise.allSettled(closeTasks);
+    }
   }
 
   /**

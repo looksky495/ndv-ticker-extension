@@ -1,4 +1,4 @@
-const JMAWarnTypeList = {
+export const JMAWarnTypeList = {
   33: {
     name1: "大雨",
     name2: "特別警報",

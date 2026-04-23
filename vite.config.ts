@@ -100,11 +100,6 @@ export default defineConfig({
         popup: "src/popup/index.html",
         // sandbox: "src/popup/sandbox.html",
         "disp-commands": "src/disp-commands/index.html"
-      },
-      output: {
-        manualChunks: {
-          jszip: ["jszip"]
-        }
       }
       // output: {
       //   entryFileNames: `src/[name].js`,

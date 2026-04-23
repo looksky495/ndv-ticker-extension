@@ -20,6 +20,6 @@
     "vite-plugin-wasm": "^3.5.0"
   },
   "dependencies": {
-    "jszip": "^3.10.1"
+    "@zip.js/zip.js": "^2.8.26"
   }
 }

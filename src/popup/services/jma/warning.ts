@@ -1,4 +1,4 @@
-import { TrafficTracker } from "../TrafficTracker.ts";
+import { TrafficTracker } from "../../ui/TrafficTracker.ts";
 import type { AreaOperator } from "./common.ts";
 
 export type WarnDataMapItem = {

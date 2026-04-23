@@ -1,4 +1,4 @@
-const MapData1 = {
+export const MapData1 = {
   TELOPS: {
     100: ["100.svg", "500.svg", "100", "晴", "CLEAR"],
     101: ["101.svg", "501.svg", "100", "晴時々曇", "PARTLY CLOUDY"],
