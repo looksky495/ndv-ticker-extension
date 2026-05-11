@@ -5,9 +5,7 @@ export namespace VXSE53 {
     export interface Report extends QT.Report {
       Control: Control;
       Head:    Head;
-      Body:    Required<Pick<QT.Body, "Earthquake" | "Comments">> & {
-        Intensity: Intensity;
-      };
+      Body:    Body;
     }
 
     export interface Control extends QT.Control {
@@ -19,15 +17,10 @@ export namespace VXSE53 {
       InfoKind: "地震情報";
       Serial: `${number}`;
     }
-
-    export interface Intensity extends QT.Intensity {
-      Observation: {
-        Pref: IntensityObsPref[];
-      };
-    }
-    export interface IntensityObsPref extends QT.IntensityObsPref {}
-    export interface IntensityObsArea extends QT.IntensityObsArea {
-      City: QT.IntensityObsCity[];
+    
+    export interface Body extends Required<Pick<QT.Body, "Earthquake" | "Comments">>, Partial<Pick<QT.Body, "Intensity">> {
+      Earthquake: QT.Earthquake | QT.DetailedEarthquake;
+      Intensity?: QT.Intensity;
     }
   }
 
@@ -49,7 +42,7 @@ export namespace VXSE53 {
     }
 
     export interface Body extends Required<Pick<QT.Body, "Earthquake" | "Comments">> {
-      Earthquake: QT.DetailedEarthquake;
+      Earthquake: QT.IntlEarthquake;
     }
   }
 

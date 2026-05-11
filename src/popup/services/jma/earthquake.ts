@@ -1,4 +1,9 @@
 import type { QuakeList } from "../../../types/jma-json/qt/quake-list.d.ts";
+import type { VXSE51 } from "../../../types/jma-json/qt/report-vxse51.js";
+import type { VXSE52 } from "../../../types/jma-json/qt/report-vxse52.js";
+import type { VXSE53 } from "../../../types/jma-json/qt/report-vxse53.d.ts";
+import type { VXSE61 } from "../../../types/jma-json/qt/report-vxse61.js";
+import type { VXSE62 } from "../../../types/jma-json/qt/report-vxse62.js";
 
 export type EarthquakeReport = {
 	type: string;
@@ -35,67 +40,28 @@ export class EarthquakeOperator extends EventTarget {
 				break;
 			}
 		},
-		vxse5x: async (src: string, type: "vxse51" | "vxse52" | "vxse53"): Promise<void> => {
-			const originData = await fetch(src).then(res => res.json()) as any;
-			const processedData: EarthquakeReport = {
-				type: type.toUpperCase(),
-				receiveTime: Date.now(),
-				pressTime: new Date(originData.Control?.DateTime ?? Date.now()),
-				reportTime: new Date(originData.Head?.ReportDateTime ?? Date.now()),
-				targetTime: new Date(originData.Head?.TargetDateTime ?? Date.now()),
-				maxIntensity: null,
-				shindoList: {},
-				originTime: null,
-				hypocenter: null,
-				magnitude: null,
-				isDistant: originData.Head?.Title === "遠地地震に関する情報",
-				tsunami: null,
-				comments: {
-					codes: [],
-					ja_JP: [],
-					en_US: []
-				}
-			};
-
-			if (originData.Body?.Comments?.ForecastComment){
-				const comment = originData.Body.Comments.ForecastComment;
-				processedData.comments.codes?.push(comment.Code);
-				processedData.comments.ja_JP.push(comment.Text);
-				processedData.comments.en_US.push(comment.Code ? "" : "");
-			}
-			if (originData.Body?.Comments?.FreeFormComment) processedData.comments.ja_JP.push(originData.Body.Comments.FreeFormComment);
-			if (originData.Body?.Intensity){
-				processedData.shindoList = {
-					regions: [],
-					cities: type === "vxse53" ? [] : null
-				};
-			}
-			if (originData.Body?.Earthquake){
-				processedData.originTime = new Date(originData.Body.Earthquake.OriginTime);
-				processedData.hypocenter = {
-					name: originData.Body.Earthquake.Hypocenter?.Area?.Name,
-					code: originData.Body.Earthquake.Hypocenter?.Area?.Code,
-					coordinate: { latitude: 0, longitude: 0 },
-					depth: null,
-					detailed: null,
-					source: null
-				};
-				const magnitudeKey = originData.Body.Earthquake.Magnitude as keyof typeof this.jma.magnitude_not_a_number;
-				processedData.magnitude = this.jma.magnitude_not_a_number[magnitudeKey] ?? (originData.Body.Earthquake.Magnitude - 0);
-			}
-			const handler = (this as any)[type];
-			if (typeof handler === "function") handler(processedData);
-		}
 	};
-	dmdata: Record<string, unknown> = {};
 	events: Record<string, unknown> = {};
-	source = "jma";
-	notice = false;
-	async vxse51 (_data: object){}
-	async vxse52 (_data: object){}
-	async vxse53 (_data: object){}
-	async vxse61 (_data: object){}
-	async vxse62 (_data: object){}
+	
+	async vxse51 (src: string){
+		const data = await fetch(src).then(res => res.json()) as VXSE51.Report;
+	}
+	async vxse52 (src: string){
+		const data = await fetch(src).then(res => res.json()) as VXSE52.Report;
+	}
+	async vxse5k (src: string){
+		const data = await fetch(src).then(res => res.json()) as VXSE53.Domestic.Report;
+	}
+	async vxse5e (src: string){
+		const data = await fetch(src).then(res => res.json()) as VXSE53.Overseas.Report;
+	}
+	async vxse61 (src: string){
+		const data = await fetch(src).then(res => res.json()) as VXSE61.Report;
+	}
+	async vxse62 (src: string){
+		const data = await fetch(src).then(res => res.json()) as VXSE62.Report;
+	}
+	
 	async view (_id: string){}
 	get latestId (){ return 0; }
 	quakeList: any[] = [];

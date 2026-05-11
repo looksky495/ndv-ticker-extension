@@ -25,4 +25,9 @@ export namespace TsunamiList {
     en_ttl?: string;
     en_anm?: string;
   };
+  
+  export type TsunamiKindEntry = {
+    code: string; // Code
+    kind: "大津波警報" | "津波警報" | "津波注意報" | "津波予報（若干の海面変動）";
+  };
 }

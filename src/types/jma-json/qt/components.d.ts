@@ -31,16 +31,17 @@ export namespace QT {
     InfoKind:        string;
     InfoKindVersion: string;
     Headline:        Headline;
-    enTitle:         string;
+    enTitle?:        string;
   }
 
   export interface Headline {
     Text: string;
+    Information?: Array;
   }
 
   export interface Body {
-    Earthquake?:     Earthquake;
-    Intensity?:      Intensity;
+    Earthquake?:     Earthquake | Earthquake[];
+    Intensity?:      Intensity | LgIntensity;
     Comments?:       Comments;
     EarthquakeInfo?: EarthquakeInfo;
     Text?:           string;
@@ -50,50 +51,65 @@ export namespace QT {
   export interface Earthquake {
     OriginTime:  string;
     ArrivalTime: string;
-    Hypocenter: {
-      Area: {
-        Name:       string;
-        Code:       string;
-        Coordinate: string;
-        enName:     string;
-      }
-    }
-    Magnitude: `${Component.Digit}.${Component.Digit}` | "Ｍ８を超える巨大地震" | "不明";
+    Hypocenter:  Hypocenter;
+    Magnitude: `${Component.Digit}.${Component.Digit}` | "Ｍ８を超える巨大地震" | "Ｍ不明";
+  }
+  
+  export interface Hypocenter {
+    Area: HypocenterArea;
+  }
+  
+  export interface HypocenterArea {
+    Name:       string;
+    Code:       string;
+    Coordinate: string;
+    enName:     string;
   }
 
+  export interface IntlEarthquake extends Earthquake {
+    Hypocenter: IntlHypocenter;
+  }
+  
+  export interface IntlHypocenter extends Hypocenter {
+    Area:   IntlHypocenterArea;
+    Source: EpicenterSource;
+  }
+  
+  export interface IntlHypocenterArea extends HypocenterArea {
+    DetailedName: string;
+    DetailedCode: string;
+  }
+  
   export interface DetailedEarthquake extends Earthquake {
-    Hypocenter: {
-      Area: {
-        DetailedName: string;
-        DetailedCode: string;
-      }
-      Source: EpicenterSource;
-    }
+    Hypocenter: DetailedHypocenter;
   }
-
-  export interface DetailedDomesticEarthquake extends Earthquake {
-    Hypocenter: {
-      Area: {
-        NameFromMark: string;
-        MarkCode:     string;
-        Direction:    string;
-        Distance:     `${number}`;
-      }
-    }
+  
+  export interface DetailedHypocenter extends Hypocenter {
+    Area: DetailedHypocenterArea;
+  }
+  
+  export interface DetailedHypocenterArea extends HypocenterArea {
+    NameFromMark: string;
+    MarkCode:     string;
+    Direction:    string;
+    Distance:     `${number}`;
   }
 
 
   export interface Intensity {
-    Observation: {
-      MaxInt: ShortIntCode;
-      Pref: IntensityObsPref[];
-    };
+    Observation: IntensityObs;
+  }
+  
+  export interface IntensityObs {
+    MaxInt: ShortIntCode;
+    Pref: IntensityObsPref[];
   }
 
   export interface IntensityObsPref {
     Name:   string;
     Code:   string;
     MaxInt: ShortIntCode;
+    Revise?: "追加" | "上方修正" | "下方修正";
     Area:   IntensityObsArea[];
     enName: string;
   }
@@ -102,7 +118,8 @@ export namespace QT {
     Name:   string;
     Code:   string;
     MaxInt: ShortIntCode;
-    City?:  IntensityObsCity[] | never;
+    Revise?: "追加" | "上方修正" | "下方修正";
+    City?:  IntensityObsCity[];
     enName: string;
   }
 
@@ -110,6 +127,7 @@ export namespace QT {
     Name:   string;
     Code:   string;
     MaxInt: ShortIntCode;
+    Revise?: "追加" | "上方修正" | "下方修正";
     IntensityStation: IntensityObsStation[];
     enName: string;
   }
@@ -117,7 +135,55 @@ export namespace QT {
   export interface IntensityObsStation {
     Name:   string;
     Code:   string;
-    Int:    ShortIntCode;
+    Int?:    ShortIntCode;
+    Revise?: "追加" | "上方修正" | "下方修正";
+    latlon: {
+      lat: number;
+      lon: number;
+    };
+    enName: string;
+  }
+
+  
+  export interface LgIntensity {
+    Observation: LgIntensityObs;
+  }
+  
+  export interface LgIntensityObs {
+    MaxInt: ShortIntCode;
+    MaxLgInt: ShortLgIntCode;
+    Pref: LgIntensityObsPref[];
+  }
+  
+  export interface LgIntensityObsPref {
+    Name: string;
+    Code: string;
+    MaxInt?: ShortIntCode;
+    MaxLgInt: ShortLgIntCode;
+    Revise?: "追加" | "上方修正" | "下方修正";
+    Area: LgIntensityObsArea[];
+    enName: string;
+  }
+  
+  export interface LgIntensityObsArea {
+    Name: string;
+    Code: string;
+    MaxInt?: ShortIntCode;
+    MaxLgInt: ShortLgIntCode;
+    Revise?: "追加" | "上方修正" | "下方修正";
+    IntensityStation: LgIntensityStation[];
+    enName: string;
+  }
+  
+  export interface LgIntensityStation {
+    Name: string;
+    Code: string;
+    Int?: ShortIntCode;
+    LgInt: ShortLgIntCode;
+    LgIntPerPeriod: `${number}`;
+    Sva: `${number}`;
+    SvaPerPeriod: `${number}`;
+    Revise?: "追加" | "上方修正" | "下方修正";
     latlon: {
       lat: number;
       lon: number;
@@ -167,6 +233,7 @@ export namespace QT {
   });
 
   export type ShortIntCode = "1" | "2" | "3" | "4" | "5@" | "震度５弱以上未入電" | "5-" | "5+" | "6-" | "6+" | "7";
+  export type ShortLgIntCode = "0" | "1" | "2" | "3" | "4";
   export type InfoShindoName = "震度３" | "震度４" | "震度５弱以上未入電" | "震度５弱" | "震度５強" | "震度６弱" | "震度６強" | "震度７";
   export type InfoLPGMName = "長周期地震動階級４" | "長周期地震動階級３" | "長周期地震動階級２" | "長周期地震動階級１";
 

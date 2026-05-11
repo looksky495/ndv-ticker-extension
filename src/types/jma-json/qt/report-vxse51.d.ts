@@ -37,19 +37,23 @@ export namespace VXSE51 {
     Body:    Body;
   }
 
-
   export interface Body extends Required<Pick<QT.Body, "Intensity" | "Comments">> {
     Intensity: Intensity;
   }
 
   export interface Intensity extends QT.Intensity {
-    Observation: {
-      Pref: IntensityObsPref[];
-    };
+    Observation: IntensityObs;
+  }
+  
+  export interface IntensityObs extends QT.IntensityObs {
+    Pref: IntensityObsPref[];
   }
 
-  export interface IntensityObsPref extends QT.IntensityObsPref {}
+  export interface IntensityObsPref extends QT.IntensityObsPref {
+    Area: IntensityObsArea[];
+  }
+  
   export interface IntensityObsArea extends QT.IntensityObsArea {
-    City: never;
+    City?: never;
   }
 }

@@ -16,14 +16,14 @@ export namespace VTSE41 {
       "津波警報" | "津波警報・津波予報" | "津波警報・津波注意報" | "津波警報・津波注意報・津波予報" |
       "大津波警報" | "大津波警報・津波予報" | "大津波警報・津波注意報" | "大津波警報・津波注意報・津波予報" |
       "大津波警報・津波警報" | "大津波警報・津波警報・津波予報" | "大津波警報・津波警報・津波注意報" | "大津波警報・津波警報・津波注意報・津波予報";
-    ValidDateTime: string;
+    ValidDateTime?: string;
     InfoKind: "津波警報・注意報・予報";
     Serial: null;
   }
 
-  export type TsunamiQuake = QT.DetailedEarthquake | QT.DetailedDomesticEarthquake;
+  export type TsunamiQuake = QT.IntlEarthquake | QT.DetailedEarthquake;
 
-  export interface Body extends Required<Pick<QT.Body, "Earthquake" | "Comments">> {
+  export interface Body extends Required<Pick<QT.Body, "Earthquake" | "Text" | "Comments">> {
     Earthquake: TsunamiQuake[];
     Tsunami: Tsunami;
   }

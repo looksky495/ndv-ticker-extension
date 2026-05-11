@@ -4,7 +4,7 @@ export namespace VXSE52 {
   export interface Report extends QT.Report {
     Control: Control;
     Head:    Head;
-    Body:    Required<Pick<QT.Body, "Earthquake" | "Comments">>;
+    Body:    Body;
   }
 
   export interface Control extends QT.Control {
@@ -15,5 +15,10 @@ export namespace VXSE52 {
     Title: "震源に関する情報";
     InfoKind: "震源速報";
     Serial: null;
+    enTitle: string;
+  }
+  
+  export interface Body extends Required<Pick<QT.Body, "Earthquake" | "Comments">> {
+    Earthquake: QT.Earthquake;
   }
 }

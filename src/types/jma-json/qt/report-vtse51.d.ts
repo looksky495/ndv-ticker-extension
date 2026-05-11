@@ -17,7 +17,7 @@ export namespace VTSE51 {
     Serial: `${number}`;
   }
 
-  export type TsunamiQuake = QT.DetailedEarthquake | QT.DetailedDomesticEarthquake;
+  export type TsunamiQuake = QT.IntlEarthquake | QT.DetailedEarthquake;
 
   export interface Body extends Required<Pick<QT.Body, "Earthquake" | "Comments">> {
     Earthquake: TsunamiQuake[];
@@ -35,7 +35,7 @@ export namespace VTSE51 {
       CodeDefine: {
         Type: "潮位観測点";
       }
-      Item: TsunamiForecastItemBase[] | TsunamiForecastItemAppend[];
+      Item: (TsunamiForecastItemBase | TsunamiForecastItemAppend)[];
     }
   }
 
