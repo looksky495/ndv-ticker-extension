@@ -1,4 +1,4 @@
-import { Component } from "../components.js";
+import { Component } from "../../components.js";
 
 export namespace QT {
   export interface Report {
