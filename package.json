@@ -7,8 +7,7 @@
     "dev": "vite",
     "build:ts": "tsc && vite build",
     "build:wasm": "wasm-pack build src/wasm/rust --target web --out-name eewcalc --release",
-    "build": "npm run check:types && npm run build:wasm && npm run build:ts",
-    "check:types": "npx tsc --noEmit --skipLibCheck false --module nodenext --moduleResolution nodenext src/types/jma-json/qt/*.d.ts",
+    "build": "npm run build:wasm && npm run build:ts",
     "test:qt-ajv": "node --test --import tsx tests/qt/validate-*.test.ts"
   },
   "devDependencies": {

@@ -1,9 +1,9 @@
 import type { QuakeList } from "../../../types/jma-json/qt/quake-list.d.ts";
-import type { VXSE51 } from "../../../types/jma-json/qt/report-vxse51.js";
-import type { VXSE52 } from "../../../types/jma-json/qt/report-vxse52.js";
-import type { VXSE53 } from "../../../types/jma-json/qt/report-vxse53.d.ts";
-import type { VXSE61 } from "../../../types/jma-json/qt/report-vxse61.js";
-import type { VXSE62 } from "../../../types/jma-json/qt/report-vxse62.js";
+// import type { VXSE51 } from "../../../types/jma-json/qt/report-vxse51.js";
+// import type { VXSE52 } from "../../../types/jma-json/qt/report-vxse52.js";
+// import type { VXSE53 } from "../../../types/jma-json/qt/report-vxse53.d.ts";
+// import type { VXSE61 } from "../../../types/jma-json/qt/report-vxse61.js";
+// import type { VXSE62 } from "../../../types/jma-json/qt/report-vxse62.js";
 
 export type EarthquakeReport = {
 	type: string;
@@ -43,23 +43,23 @@ export class EarthquakeOperator extends EventTarget {
 	};
 	events: Record<string, unknown> = {};
 	
-	async vxse51 (src: string){
-		const data = await fetch(src).then(res => res.json()) as VXSE51.Report;
+	async vxse51 (_src: string){
+		// const data = await fetch(src).then(res => res.json()) as VXSE51.Report;
 	}
-	async vxse52 (src: string){
-		const data = await fetch(src).then(res => res.json()) as VXSE52.Report;
+	async vxse52 (_src: string){
+		// const data = await fetch(src).then(res => res.json()) as VXSE52.Report;
 	}
-	async vxse5k (src: string){
-		const data = await fetch(src).then(res => res.json()) as VXSE53.Domestic.Report;
+	async vxse5k (_src: string){
+		// const data = await fetch(src).then(res => res.json()) as VXSE53.Domestic.Report;
 	}
-	async vxse5e (src: string){
-		const data = await fetch(src).then(res => res.json()) as VXSE53.Overseas.Report;
+	async vxse5e (_src: string){
+		// const data = await fetch(src).then(res => res.json()) as VXSE53.Overseas.Report;
 	}
-	async vxse61 (src: string){
-		const data = await fetch(src).then(res => res.json()) as VXSE61.Report;
+	async vxse61 (_src: string){
+		// const data = await fetch(src).then(res => res.json()) as VXSE61.Report;
 	}
-	async vxse62 (src: string){
-		const data = await fetch(src).then(res => res.json()) as VXSE62.Report;
+	async vxse62 (_src: string){
+		// const data = await fetch(src).then(res => res.json()) as VXSE62.Report;
 	}
 	
 	async view (_id: string){}

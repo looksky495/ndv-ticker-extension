@@ -136,7 +136,7 @@ export class TsunamiOperator extends EventTarget {
       }
     }
 
-    if ("ValidDateTime" in data.Head){
+    if ("ValidDateTime" in data.Head && typeof data.Head.ValidDateTime === "string"){
       const validDate = new Date(data.Head.ValidDateTime);
       const validEpoch = validDate.getTime();
       if (Date.now() - validEpoch < 0){
