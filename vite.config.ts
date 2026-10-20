@@ -48,7 +48,6 @@ const manifest = defineManifest({
       "https://www.jma.go.jp/bosai/forecast/data/forecast/map.json",
       "https://weathernews.jp/river/FRICS_LWTRLV.csv",
       "https://weathernews.jp/river/csv_v2/latest.csv",
-      "https://smi.lmoniexp.bosai.go.jp/*",
       "https://www.lmoni.bosai.go.jp/*",
       "https://smtgvs.weathernews.jp/a/solive_timetable/timetable.json",
       "https://md-ndv356.github.io/ndv-tickers/*"
@@ -93,7 +92,7 @@ export default defineConfig({
     target: "esnext",
     sourcemap: true,
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         background: "src/background/index.ts",
         popup: "src/popup/index.html",

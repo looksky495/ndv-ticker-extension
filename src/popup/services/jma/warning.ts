@@ -1,37 +1,42 @@
 import { TrafficTracker } from "../../ui/traffic-tracker.ts";
 import type { AreaOperator } from "./common.ts";
 
+/**
+ * JMA bosai の `warning/data/r8/map.json` に含まれる 1 電文分のデータ。
+ * 本モジュールで参照するプロパティのみを定義している。
+ */
 export type WarnDataMapItem = {
-  reportDateTime: string;
-  areaTypes: {
-    areas: {
-      code: string;
-      warnings: {
-        code: string;
+  reportDatetime: string;
+  publishingOffice: string;
+  warning: {
+    /** 一次細分区域ごとの発表状況。発表対象がない電文には存在しない */
+    class10Items?: {
+      areaCode: string;
+      kinds: {
+        /** 警報・注意報コード（`warnCodesNew` のキー）。「発表警報・注意報はなし」のときは存在しない */
+        code?: string;
         status: string;
-        nextKinds: {
-          code: string;
-          name: string;
-        }[];
       }[];
     }[];
-  }[];
-  attentions: string[];
+  };
 };
 
 type WarnCurrentState = {
   area: any[];
   lastUpdated: number;
-  text: string;
+  /** 注意報まで含めた全ての発表状況のテキスト */
+  textAll: string;
+  /** 警報（レベル３）以上に絞った発表状況のテキスト */
+  textLvl3: string;
 };
 
 export type WarningEventType = "report";
 
 type WarningReportDetail = {
-  text: string;
+  state: WarnCurrentState;
 };
 
-type WarningReportListener = (text: string) => void;
+type WarningReportListener = (state: WarnCurrentState) => void;
 
 // Source: 気象庁ホームページ（レベル表記を含む新しい警報・注意報コード表）
 export const warnCodesNew: Record<string, { shortNameParts: string[]; nameParts: string[]; elem: string; level: number }> = {
@@ -73,14 +78,16 @@ export const warnCodesNew: Record<string, { shortNameParts: string[]; nameParts:
 };
 
 export class WarnCurrentOperator extends EventTarget {
-  private url = "https://www.jma.go.jp/bosai/warning/data/warning/map.json";
+  private url = "https://www.jma.go.jp/bosai/warning/data/r8/map.json";
   private tracker = new TrafficTracker("JMA / Warning / map.json");
   private readonly areaOperator: AreaOperator;
 
   data: WarnCurrentState = {
     area: [],
     lastUpdated: 0,
-    text: "（＊サンプル文章＊）（＊サンプル文章＊）　【セイライ島】 大雨警報・雷注意報　　【下風蝕地】 乾燥注意報　　【フォンテーヌ邸地区】 大雨特別警報・洪水危険警報・波浪警報　（インターネット接続を確認してください）"
+    // サンプルの文章に現実の地名入ってたら怒られそうなので
+    textAll: "（＊サンプル文章＊）　【セイライ島】 大雨警報・雷注意報　　【下風蝕地】 乾燥注意報　　【フォンテーヌ邸地区】 大雨特別警報・洪水危険警報・波浪警報　（インターネット接続を確認してください）",
+    textLvl3: "こちらは警報（レベル３）以上の情報一覧です。"
   };
 
   constructor (areaOperator: AreaOperator){
@@ -91,47 +98,71 @@ export class WarnCurrentOperator extends EventTarget {
   subscribe (eventType: WarningEventType, listener: WarningReportListener){
     const eventListener: EventListener = (event) => {
       const detail = (event as CustomEvent<WarningReportDetail>).detail;
-      listener(detail.text);
+      listener(detail.state);
     };
     this.addEventListener(eventType, eventListener);
     return () => this.removeEventListener(eventType, eventListener);
   }
 
-  notifyUpdate (text: string){
-    this.dispatchEvent(new CustomEvent<WarningReportDetail>("report", { detail: { text } }));
+  notifyUpdate (){
+    this.dispatchEvent(new CustomEvent<WarningReportDetail>("report", { detail: { state: this.data } }));
   }
 
   async load(){
-    const AreaData = await this.areaOperator.getData();
+    const areaData = await this.areaOperator.getData();
     await fetch(this.url + "?_=" + Date.now()).then(async res => {
       this.tracker.update();
 
       const lastModified = new Date(res.headers.get("Last-Modified") as string).getTime() / 1000;
-      if (this.data.lastUpdated === lastModified) return null;
+      if (this.data.lastUpdated === lastModified) return null; // 更新されていない場合は終了
 
-      const warnList: string[] = [];
-      const WarnData = await res.json() as WarnDataMapItem[];
-      for (const item of WarnData){
-        for (const area of item.areaTypes[0].areas){
-          if (area.warnings[0].status === "発表警報・注意報はなし") continue;
+      // 同じ一次細分区域が複数の電文（警報種別ごとに分かれている）に現れるため、areaCode をキーにコードを集約する
+      const all: Record<string, string[]> = {};
+      const warnData = await res.json() as WarnDataMapItem[];
+      for (const report of warnData){
+        if (!report.warning.class10Items) continue;
 
-          const warnings = area.warnings.filter(item => {
-            return item.status !== "解除";
-          }).map(item => {
-            const warn = warnCodesNew[item.code];
-            return warn.nameParts.join("");
-          }).join("・");
-          if (!warnings) continue;
+        for (const area of report.warning.class10Items){
+          const areaCode = area.areaCode;
 
-          const class10s = AreaData.class10s[area.code];
-          const offices = AreaData.offices[class10s.parent];
-          const head2 = area.code.slice(0, 2);
-          const pointName = ((["13", "27", "37"].includes(head2) || ["460030", "472000", "473000", "474010", "474020"].includes(area.code)) ? "" : (["01", "46", "47"].includes(head2) ? {"01": "北海道", "46": "鹿児島県", "47": "沖縄県"}[head2] : offices.name)) + class10s.name;
+          for (const kind of area.kinds){
+            if (kind.status === "解除") continue;
+            if (!kind.code) continue; // 発表がない区域はコードを持たない
 
-          warnList.push("【" + pointName + "】 " + warnings + (item.attentions ? "（" + item.attentions.join("・") + "）" : ""));
+            if (!all[areaCode]) all[areaCode] = [];
+            all[areaCode].push(kind.code);
+          }
         }
       }
-      this.notifyUpdate(this.data.text = warnList.join("　　"));
+
+      const allArray = Object.entries(all).sort((a, b) => Number(a[0]) - Number(b[0])); // areaCode 順にソート
+      const warnListAll: string[] = [];
+      const warnListLvl3: string[] = [];
+      for (const [areaCode, codes] of allArray){
+        const warnAll = codes.map(code => {
+          const warn = warnCodesNew[code];
+          return warn.nameParts.join("");
+        }).join("・");
+        const warnLvl3 = codes.filter(code => {
+          const warn = warnCodesNew[code];
+          return warn.level >= 30;
+        }).map(code => {
+          const warn = warnCodesNew[code];
+          return warn.nameParts.join("");
+        }).join("・");
+
+        const class10s = areaData.class10s[areaCode];
+        const offices = areaData.offices[class10s.parent];
+        const head2 = areaCode.slice(0, 2); // コード先頭2文字
+        const pointName = ((["13", "27", "37"].includes(head2) || ["460030", "472000", "473000", "474010", "474020"].includes(areaCode)) ? "" : (["01", "46", "47"].includes(head2) ? {"01": "北海道", "46": "鹿児島県", "47": "沖縄県"}[head2] : offices.name)) + class10s.name;
+
+        warnListAll.push("【" + pointName + "】 " + warnAll);
+        if (warnLvl3) warnListLvl3.push("【" + pointName + "】 " + warnLvl3);
+      }
+
+      this.data.textAll = warnListAll.length ? warnListAll.join("　　") : "なんと、気象警報が発表されている地域はありません。";
+      this.data.textLvl3 = warnListLvl3.length ? warnListLvl3.join("　　") : "気象警報（レベル３）以上が発表されている地域はありません。";
+      this.notifyUpdate();
       this.data.lastUpdated = lastModified;
     });
   }

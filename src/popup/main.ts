@@ -491,6 +491,7 @@ const normalText = (() => {
     { text: '現在の気圧', id: "weather/pressure", kind: 'live' },
     { text: '河川情報', id: "weather/river", kind: 'river' },
     { text: '気象警報・注意報', id: "weather/warn", kind: 'warn' },
+    { text: '気象警報（警報以上）', id: "weather/warn/lvl3", kind: 'warn' },
     { text: '台風コメント', id: "weather/typh/comments", kind: 'warn' },
     { text: '避難情報', id: "bousai/evacuation", kind: 'evac' },
     { text: '避難情報（緊急）', id: "bousai/evacuation/emergency", kind: 'evac' },
@@ -1514,6 +1515,44 @@ async function savedata(){
   }
 }
 
+async function exportSettings(){
+  try {
+    // 未保存の変更を含めるため、出力前に現在の設定を保存する
+    await savedata();
+    const data = await chrome.storage.sync.get(['mode0', 'mode3', 'settings', 'app']);
+
+    const now = getAdjustedDate();
+    const stamp = now.getFullYear()
+      + (now.getMonth()+1+"").padStart(2, "0")
+      + (now.getDate()+"").padStart(2, "0")
+      + "-"
+      + (now.getHours()+"").padStart(2, "0")
+      + (now.getMinutes()+"").padStart(2, "0")
+      + (now.getSeconds()+"").padStart(2, "0");
+
+    const output = {
+      type: "ndv-ticker-settings",
+      formatVersion: 1,
+      exportedAt: now.toISOString(),
+      appVersion: AppVersionView,
+      appVersionCode: AppVersionCode,
+      data
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(output, null, 2)], {type: "application/json"}));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "ndv-settings-" + stamp + ".json";
+    link.click();
+    URL.revokeObjectURL(url);
+    console.log("Settings exported.");
+  } catch (e){
+    console.error("Settings export failed: " + e);
+    alert("設定の出力に失敗しました。\n" + e);
+  }
+}
+document.getElementById("config.exportButton")!.addEventListener("click", exportSettings);
+
+
 function bit(number: any, bitL: any){
   return number & (2 ** bitL) && 1;
 }
@@ -2266,7 +2305,7 @@ var lastnum = 0,
 let eewOffset = NaN;
 async function eewCalcOffset_c1(){
   if (isNaN(eewOffset)){
-    return await fetch("https://smi.lmoniexp.bosai.go.jp/webservice/server/pros/latest.json?_="+Date.now()).then(res => res.json()).then(data => {
+    return await fetch("https://www.lmoni.bosai.go.jp/img_svr/webservice/server/pros/latest.json?_=" + Date.now()).then(res => res.json()).then(data => {
       return eewOffset = Number(new Date(data.latest_time)) - Number(new Date(data.request_time));
     });
   } else return eewOffset;
@@ -2313,7 +2352,7 @@ function eewChecking_c1(){
         if (!eewIsAlert){
           if (audioAPI.oscillatorNode.starting) audioAPI.fun.stopOscillator();
         }
-        const isForcedTime = eewOriginTime.getTime()+90000 > (safeGetFormattedDate(2) as any);
+        const isForcedTime = eewOriginTime.getTime() + 90000 > (safeGetFormattedDate(2) as any);
         if (isForcedTime || Number(eewReportNumber) < 13 || viewMode !== 2){
           SetMode(1);
           eewMapDraw(data.longitude-0, data.latitude-0);
@@ -3253,7 +3292,7 @@ weatherInfo.tracker = new TrafficTracker("JMA / 気象情報 一覧");
  * @param dataXml 電文の XMLDocument
  */
 const weatherVPBS50 = async (dataXml: XMLDocument) => {
-  const area = await DataOperator.area.getData() as any;
+  const AreaData = await DataOperator.area.getData() as any;
 
   const infoType = dataXml.querySelector('Headline > Information > Item > Kind > Condition')?.textContent ?? "";
   if (infoType === "取消"){
@@ -3271,16 +3310,29 @@ const weatherVPBS50 = async (dataXml: XMLDocument) => {
     informations[kindType] = kindConditions;
   }
 
-  if (informations["情報タグ"] === "線状降水帯直前"){
-    NewsOperator.add(reportTitle, headlineText, "");
-  } else if (informations["情報タグ"] === "線状降水帯発生"){
-    NewsOperator.add(reportTitle, headlineText, "線状降水帯が発生しています。");
+  if (informations["情報タグ"] === "線状降水帯直前" || informations["情報タグ"] === "線状降水帯発生"){
+    const areas = Array.from(dataXml.querySelectorAll('Body > MeteorologicalInfos[type="観測実況"] > MeteorologicalInfo > Item > Area > Code'));
+
+    for (let i = 0; i < areas.length; i ++){
+      const area = areas[i];
+      const areaCode = area.textContent;
+      const class10s = AreaData.class10s[areaCode];
+      const offices = AreaData.offices[class10s.parent];
+      const head2 = areaCode.slice(0, 2); // コード先頭2文字
+      const pointName = ((["13", "27", "37"].includes(head2) || ["460030", "472000", "473000", "474010", "474020"].includes(areaCode)) ? "" : (["01", "46", "47"].includes(head2) ? {"01": "北海道", "46": "鹿児島県", "47": "沖縄県"}[head2] : offices.name)) + class10s.name;
+
+      if (informations["情報タグ"] === "線状降水帯直前"){
+        NewsOperator.add(reportTitle, "", `(${i + 1}/${areas.length})　${pointName} では、今後3時間以内に線状降水帯が発生する可能性が高い`);
+      } else {
+        NewsOperator.add(reportTitle, "", `(${i + 1}/${areas.length})　${pointName} では、線状降水帯が発生`);
+      }
+    }
   } else if (informations["情報タグ"] === "記録雨"){
     try {
       const areaCode = dataXml.querySelector('Head > Headline > Information[type="情報タグ"] > Item > Areas > Area > Code')?.textContent ?? "";
-      const areaData = area.offices[area.class10s[areaCode].parent];
-      const areaJP = (areaData.name as string).replace("（奄美地方除く）", "");
-      const areaEN = (areaData.enName as string).replace(" (Excluding Amami)", "");
+      const parentData = AreaData.offices[AreaData.class10s[areaCode].parent];
+      const areaJP = (parentData.name as string).replace("（奄美地方除く）", "");
+      const areaEN = (parentData.enName as string).replace(" (Excluding Amami)", "");
 
       const points = dataXml.querySelectorAll('Body > MeteorologicalInfos[type="観測実況"] > MeteorologicalInfo > Item');
       for (const point of points){
@@ -3290,7 +3342,8 @@ const weatherVPBS50 = async (dataXml: XMLDocument) => {
           minute: "2-digit"
         });
 
-        const pointName = point.querySelector('Area > Name')?.textContent ?? "";
+        const pointName = point.querySelector('Area > Name')?.textContent ?? point.querySelector('Station > Name')?.textContent;
+        // const isApproxPoint = point.querySelector('Area > Status')?.textContent === "付近";
 
         const precipitationElement = point.querySelector('Kind > Property > PrecipitationPart > Precipitation');
         if (!precipitationElement) continue;
@@ -3299,15 +3352,15 @@ const weatherVPBS50 = async (dataXml: XMLDocument) => {
         const precCondition = precipitationElement.getAttribute("condition");
         const isAnalysis = precType === "前１時間解析雨量";
 
-        if (!precType.startsWith("前１時間")) continue; // 記録雨は前1時間の降水量のみ対象のはずだからそれ以外はスキップ
+        if (!precType.startsWith("前１時間")) continue;
 
         NewsOperator.add(
           "記録的短時間大雨　" + areaJP + " （" + observedTimeStr + "）", "",
-          `　${pointName}　${precCondition === "約" ? "約" : ""} ${precValue} mm/h ${precType === "以上" ? "以上" : ""} （${isAnalysis ? "解析" : "観測値"}）`
+          `　${pointName} で 1 時間に${precCondition === "約" ? "約" : ""} ${precValue} mm ${precCondition === "以上" ? "以上" : ""} （${isAnalysis ? "解析雨量" : "観測値"}）`
         );
         NewsOperator.add(
           "** Short-term Heavy Rain ** in " + areaEN + " (" + observedTimeStr + ")", "",
-          `　${pointName}　${precCondition === "約" ? "Approx. " : ""} ${precValue} mm/h ${precType === "以上" ? "or more" : ""} (${isAnalysis ? "Analysis" : "Observation"}) at ${pointName}`
+          `　${precCondition === "約" ? "Approx. " : ""} ${precValue} mm/h ${precCondition === "以上" ? "or more" : ""} ${isAnalysis ? "" : "observed "}at ${pointName}`
         );
       }
     } catch (e){
@@ -3831,6 +3884,8 @@ DataOperator.earthquake.onActivated = (_eventId, detail) => {
   q_magnitude = detail.magnitude;
   q_maxShindo = detail.maxShindo;
   quakeText = detail.shindoOneline.slice();
+  if (quakeText[5]) quakeText[5] = "＜震度５弱以上と推定＞ " + quakeText[5];
+
   // 遠地地震情報の津波高さの文章をティッカー用に改変
   if (detail.summaryText.freeFormComment.includes("観測された各地の津波の高さは以下の")){
     quakeText[0] = quakeText[0].replace("　　　", `${
@@ -3914,7 +3969,8 @@ DataOperator.typh_comment.subscribe("report", data => {
   }
 });
 DataOperator.warn_current.subscribe("report", data => {
-  normalText.commands.set("weather/warn", data);
+  normalText.commands.set("weather/warn", data.textAll);
+  normalText.commands.set("weather/warn/lvl3", data.textLvl3);
 });
 
 function quakeTemplateView(viewId: number){

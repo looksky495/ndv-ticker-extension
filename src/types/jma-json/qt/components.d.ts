@@ -1,4 +1,8 @@
-import { Component } from "../../components.js";
+export type MakeRequired<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
+
+export namespace Component {
+  export type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+}
 
 export namespace QT {
   export interface Report {
@@ -54,11 +58,11 @@ export namespace QT {
     Hypocenter:  Hypocenter;
     Magnitude: `${Component.Digit}.${Component.Digit}` | "Ｍ８を超える巨大地震" | "Ｍ不明";
   }
-  
+
   export interface Hypocenter {
     Area: HypocenterArea;
   }
-  
+
   export interface HypocenterArea {
     Name:       string;
     Code:       string;
@@ -69,25 +73,25 @@ export namespace QT {
   export interface IntlEarthquake extends Earthquake {
     Hypocenter: IntlHypocenter;
   }
-  
+
   export interface IntlHypocenter extends Hypocenter {
     Area:   IntlHypocenterArea;
     Source: EpicenterSource;
   }
-  
+
   export interface IntlHypocenterArea extends HypocenterArea {
     DetailedName: string;
     DetailedCode: string;
   }
-  
+
   export interface DetailedEarthquake extends Earthquake {
     Hypocenter: DetailedHypocenter;
   }
-  
+
   export interface DetailedHypocenter extends Hypocenter {
     Area: DetailedHypocenterArea;
   }
-  
+
   export interface DetailedHypocenterArea extends HypocenterArea {
     NameFromMark: string;
     MarkCode:     string;
@@ -99,16 +103,16 @@ export namespace QT {
   export interface Intensity {
     Observation: IntensityObs;
   }
-  
+
   export interface IntensityObs {
-    MaxInt: ShortIntCode;
+    MaxInt: ShortMaxIntCode;
     Pref: IntensityObsPref[];
   }
 
   export interface IntensityObsPref {
     Name:   string;
     Code:   string;
-    MaxInt: ShortIntCode;
+    MaxInt?: ShortMaxIntCode;
     Revise?: "追加" | "上方修正" | "下方修正";
     Area:   IntensityObsArea[];
     enName: string;
@@ -117,7 +121,7 @@ export namespace QT {
   export interface IntensityObsArea {
     Name:   string;
     Code:   string;
-    MaxInt: ShortIntCode;
+    MaxInt?: ShortMaxIntCode;
     Revise?: "追加" | "上方修正" | "下方修正";
     City?:  IntensityObsCity[];
     enName: string;
@@ -126,7 +130,8 @@ export namespace QT {
   export interface IntensityObsCity {
     Name:   string;
     Code:   string;
-    MaxInt: ShortIntCode;
+    MaxInt?: ShortMaxIntCode;
+    Condition?: "震度５弱以上未入電";
     Revise?: "追加" | "上方修正" | "下方修正";
     IntensityStation: IntensityObsStation[];
     enName: string;
@@ -144,37 +149,37 @@ export namespace QT {
     enName: string;
   }
 
-  
+
   export interface LgIntensity {
     Observation: LgIntensityObs;
   }
-  
+
   export interface LgIntensityObs {
-    MaxInt: ShortIntCode;
+    MaxInt: ShortMaxIntCode;
     MaxLgInt: ShortLgIntCode;
     Pref: LgIntensityObsPref[];
   }
-  
+
   export interface LgIntensityObsPref {
     Name: string;
     Code: string;
-    MaxInt?: ShortIntCode;
+    MaxInt?: ShortMaxIntCode;
     MaxLgInt: ShortLgIntCode;
     Revise?: "追加" | "上方修正" | "下方修正";
     Area: LgIntensityObsArea[];
     enName: string;
   }
-  
+
   export interface LgIntensityObsArea {
     Name: string;
     Code: string;
-    MaxInt?: ShortIntCode;
+    MaxInt?: ShortMaxIntCode;
     MaxLgInt: ShortLgIntCode;
     Revise?: "追加" | "上方修正" | "下方修正";
     IntensityStation: LgIntensityStation[];
     enName: string;
   }
-  
+
   export interface LgIntensityStation {
     Name: string;
     Code: string;
@@ -232,7 +237,8 @@ export namespace QT {
     Condition: "津波到達中と推測" | "第１波の到達を確認";
   });
 
-  export type ShortIntCode = "1" | "2" | "3" | "4" | "5@" | "震度５弱以上未入電" | "5-" | "5+" | "6-" | "6+" | "7";
+  export type ShortMaxIntCode = "1" | "2" | "3" | "4" | "5-" | "5+" | "6-" | "6+" | "7";
+  export type ShortIntCode = ShortMaxIntCode | "5@" | "震度５弱以上未入電";
   export type ShortLgIntCode = "0" | "1" | "2" | "3" | "4";
   export type InfoShindoName = "震度３" | "震度４" | "震度５弱以上未入電" | "震度５弱" | "震度５強" | "震度６弱" | "震度６強" | "震度７";
   export type InfoLPGMName = "長周期地震動階級４" | "長周期地震動階級３" | "長周期地震動階級２" | "長周期地震動階級１";

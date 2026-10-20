@@ -38,7 +38,7 @@ type TyphoonReportDetail = {
 type TyphoonReportListener = (state: TyphCommentOperator) => void;
 
 export class TyphCommentOperator extends EventTarget {
-  private url_info = "https://www.jma.go.jp/bosai/information/data/typhoon.json";
+  private url_info = "https://www.jma.go.jp/bosai/information/data/r8/information.json";
   private url_typh = "https://www.jma.go.jp/bosai/typhoon/data/targetTc.json";
   private tracker_info = new TrafficTracker("JMA / Typhoon / typhoon.json");
   private tracker_typh = new TrafficTracker("JMA / Typhoon / targetTc.json");

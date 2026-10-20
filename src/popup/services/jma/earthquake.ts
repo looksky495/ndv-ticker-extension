@@ -243,7 +243,7 @@ export class EarthquakeOperator {
     const eventId = data.Head.EventID;
     const detail = this.quakeData[eventId].detail as QuakeDetail;
 
-    const observation = (data.Body.Intensity as QT.Intensity).Observation;
+    const observation = data.Body.Intensity.Observation;
     detail.maxShindo = this.shindo_list[observation.MaxInt] ?? 0;
     detail.timeStr = new Date(data.Head.TargetDateTime).strftime("%Y-%m-%d %H:%M");
 
@@ -319,7 +319,7 @@ export class EarthquakeOperator {
         for (const area of pref.Area){
           if (!area.City) continue;
           for (const city of area.City){
-            const maxIntIndex = this.shindo_list[city.MaxInt];
+            const maxIntIndex = this.shindo_list[city.MaxInt ?? city.Condition ?? "不明"]; // TODO: 構造上"不明"をとれない
             if (!Object.hasOwn(prefShindoList[maxIntIndex], pref.Name)){
               prefShindoList[maxIntIndex][pref.Name] = [];
             }

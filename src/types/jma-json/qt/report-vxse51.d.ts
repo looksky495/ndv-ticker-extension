@@ -1,6 +1,8 @@
 import type { QT } from "./components.js";
 
 export namespace VXSE51 {
+  type MaxIntCode = "3" | "4" | "5-" | "5+" | "6-" | "6+" | "7";
+
   export interface Control extends QT.Control {
     Title: "震度速報";
   }
@@ -44,16 +46,18 @@ export namespace VXSE51 {
   export interface Intensity extends QT.Intensity {
     Observation: IntensityObs;
   }
-  
+
   export interface IntensityObs extends QT.IntensityObs {
     Pref: IntensityObsPref[];
+    MaxInt: MaxIntCode;
   }
 
-  export interface IntensityObsPref extends QT.IntensityObsPref {
+  export interface IntensityObsPref extends Required<Pick<QT.IntensityObsPref, "Name" | "Code" | "MaxInt" | "Area" | "enName">> {
     Area: IntensityObsArea[];
+    MaxInt: MaxIntCode;
   }
-  
-  export interface IntensityObsArea extends QT.IntensityObsArea {
-    City?: never;
+
+  export interface IntensityObsArea extends Required<Pick<QT.IntensityObsArea, "Name" | "Code" | "MaxInt" | "enName">> {
+    MaxInt: MaxIntCode;
   }
 }
